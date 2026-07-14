@@ -195,6 +195,12 @@
   .gpane{display:none;text-align:left;margin-top:14px}
   .gpane.on{display:block}
   .gpane .field{margin-bottom:11px}
+  .rem-box{border:1px dashed var(--line);border-radius:var(--radius);padding:12px;margin-top:4px;background:#FBFCFB}
+  .rem-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .rem-row{display:grid;grid-template-columns:1fr 110px 34px;gap:8px;align-items:end;margin-bottom:8px}
+  .rem-row .btn{padding:9px 0}
+  .rem-none{font-size:12px;color:var(--ink-3);padding:4px 0 8px}
+  .rem-note{font-size:11.5px;color:var(--ink-3);line-height:1.45;margin-top:2px}
   .userbox{display:inline-flex;align-items:center;gap:8px;margin-top:5px}
   .userbox .who{color:#EFF1EF;font-size:12px;font-weight:600}
   .userbox .role{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--brass)}
@@ -352,6 +358,19 @@
             <div class="field"><label for="fDate">Ημερομηνία ραντεβού</label><input id="fDate" type="date"></div>
             <div class="field"><label for="fTime">Ώρα</label><input id="fTime" inputmode="numeric" autocomplete="off" placeholder="π.χ. 1800 → 18:00"></div>
           </div>
+
+          <div class="rem-box">
+            <div class="rem-h">
+              <label style="margin:0">Ημερομηνίες ευγενικής υπενθύμισης</label>
+              <div style="display:flex;gap:6px">
+                <button class="btn ghost sm" id="btnRemMail" type="button" title="Σύνταξη email ευγενικής υπενθύμισης">✉ Υπενθύμιση</button>
+                <button class="btn brass sm" id="btnRemAdd" type="button">+ Προσθήκη</button>
+              </div>
+            </div>
+            <div id="remList"></div>
+            <p class="rem-note">Κάθε υπενθύμιση χτυπάει <b>15 λεπτά πριν</b> από την ώρα της, με τον ίδιο ήχο. Οι υπενθυμίσεις <b>δεν εμφανίζονται</b> στο Ημερήσιο / Εβδομαδιαίο / Μηνιαίο πρόγραμμα — εκεί φαίνεται μόνο η ημερομηνία του ραντεβού.</p>
+          </div>
+
           <div class="row-end">
             <button class="btn ghost" id="btnReset">Καθαρισμός</button>
             <button class="btn brass" id="btnAdd">Add</button>
@@ -816,7 +835,7 @@ let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),upda
 const norm=d=>{
   const o=Object.assign({clients:[],appointments:[],history:[],services:null,updated:null},d||{});
   if(!Array.isArray(o.services)||!o.services.length) o.services=DEF_SERVICES.slice();
-  o.appointments=o.appointments.map(a=>Object.assign({cost:0,paid:false,services:[]},a));
+  o.appointments=o.appointments.map(a=>Object.assign({cost:0,paid:false,services:[],reminders:[]},a));
   return o;
 };
 const apptsOf=id=>DB.appointments.filter(a=>a.clientId===id).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
@@ -846,8 +865,8 @@ const allSheets=()=>[sheetClients(DB.clients),sheetAppts(apptsSorted()),sheetHis
 /* ΣΥΜΠΛΗΡΩΣΕ ΤΑ ΔΥΟ ΠΑΡΑΚΑΤΩ ΑΠΟ:
    Supabase Dashboard → Project Settings → API
    Το anon key ΕΙΝΑΙ δημόσιο by design — η προστασία γίνεται από τα RLS policies. */
-const SUPA_URL  = "https://glqwidlnwtofxpndvydr.supabase.co";
-const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdscXdpZGxud3RvZnhwbmR2eWRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5OTk5ODAsImV4cCI6MjA5OTU3NTk4MH0.knbRacvyDbdzrPw9PD9TYrz_LMQvQhHSGphXtBdaHyA";
+const SUPA_URL  = "https://XXXXXXXXXXXX.supabase.co";
+const SUPA_ANON = "eyJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 
 const KEY="bcsa-crm", FOLDER="CRM_bcsa_Information";
 
@@ -1215,6 +1234,44 @@ function fillFrom(c){
   $("#fName").value=c.name; $("#fEmail").value=c.email||""; $("#fPhone").value=c.phone||"";
   clearSug(); checkForm(); $("#fDate").focus();
 }
+/* ---- Ευγενικές υπενθυμίσεις (φόρμα) ---- */
+let formRems=[];
+function renderRems(){
+  const box=$("#remList"); if(!box) return;
+  if(!formRems.length){ box.innerHTML='<div class="rem-none">Καμία υπενθύμιση. Πατήστε «+ Προσθήκη».</div>'; return; }
+  box.innerHTML=formRems.map((r,i)=>`
+    <div class="rem-row">
+      <div class="field" style="margin:0">
+        ${i===0?'<label>Ημερομηνία</label>':''}
+        <input type="date" data-rd="${r.id}" value="${esc(r.date||"")}">
+      </div>
+      <div class="field" style="margin:0">
+        ${i===0?'<label>Ώρα</label>':''}
+        <input inputmode="numeric" placeholder="π.χ. 1000" data-rt="${r.id}" value="${esc(r.time||"")}">
+      </div>
+      <button class="btn ghost" type="button" data-rx="${r.id}" title="Αφαίρεση">✕</button>
+    </div>`).join("");
+  box.querySelectorAll("[data-rd]").forEach(el=>el.oninput=()=>{ const r=formRems.find(x=>x.id===el.dataset.rd); if(r) r.date=el.value; });
+  box.querySelectorAll("[data-rt]").forEach(el=>el.oninput=()=>{ const r=formRems.find(x=>x.id===el.dataset.rt); if(r) r.time=el.value; });
+  box.querySelectorAll("[data-rx]").forEach(el=>el.onclick=()=>{ formRems=formRems.filter(x=>x.id!==el.dataset.rx); renderRems(); });
+}
+function addRem(){
+  formRems.push({id:uid(), date:$("#fDate").value||todayISO(), time:""});
+  renderRems();
+  const inputs=$("#remList").querySelectorAll("[data-rt]");
+  if(inputs.length) inputs[inputs.length-1].focus();
+}
+function collectRems(){
+  const out=[];
+  for(const r of formRems){
+    if(!r.date && !r.time) continue;
+    const t=normTime((r.time||"").trim());
+    if(!r.date || !t) return {err:"Κάθε υπενθύμιση χρειάζεται ημερομηνία ΚΑΙ έγκυρη ώρα (π.χ. 1000)."};
+    out.push({id:r.id, date:r.date, time:t});
+  }
+  return {list:out};
+}
+
 function resetForm(){
   ["fName","fEmail","fPhone","fDesc","fTime","fCost","editApptId"].forEach(id=>$("#"+id).value="");
   $("#fPaid").checked=false;
@@ -1222,6 +1279,7 @@ function resetForm(){
   $("#descCnt").textContent="0 / 1000";
   renderSvcForm([]);
   $("#flags").innerHTML=""; clearSug();
+  formRems=[]; renderRems();
   $("#formTitle").textContent="Νέα καταχώριση";
   $("#formSub").textContent="Πελάτης + ραντεβού";
   $("#btnAdd").textContent="Add";
@@ -1239,6 +1297,11 @@ async function addEntry(){
   if(date&&!time){ toast("Δώσατε ημερομηνία χωρίς ώρα.",true); $("#fTime").focus(); return; }
   if(time&&!date){ toast("Δώσατε ώρα χωρίς ημερομηνία.",true); $("#fDate").focus(); return; }
   if(time) $("#fTime").value=time;
+
+  const R=collectRems();
+  if(R.err){ toast(R.err,true); return; }
+  const reminders=R.list;
+  if(reminders.length && !date){ toast("Οι υπενθυμίσεις απαιτούν ραντεβού με ημερομηνία.",true); $("#fDate").focus(); return; }
 
   let c=findClient(name,phone);
   if(c){
@@ -1258,14 +1321,14 @@ async function addEntry(){
   if(editId){
     const a=DB.appointments.find(x=>x.id===editId);
     if(a){
-      Object.assign(a,{clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services});
+      Object.assign(a,{clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,reminders});
       logIt(`Τροποποίηση ραντεβού: ${c.name} — ${grDate(date)} ${time}${extra?" · "+extra:""}`,"sys",c.name);
       toast("Το ραντεβού ενημερώθηκε.");
     }
   }else if(date){
     const clash=DB.appointments.find(a=>a.date===date&&a.time===time&&a.status==="scheduled");
     if(clash&&!confirm(`Υπάρχει ήδη ραντεβού στις ${grDate(date)} ${time} (${clash.clientName}). Να καταχωρηθεί κι αυτό;`)) return;
-    DB.appointments.push({id:uid(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,status:"scheduled",createdAt:Date.now()});
+    DB.appointments.push({id:uid(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,reminders,status:"scheduled",createdAt:Date.now()});
     logIt(`Νέο ραντεβού: ${c.name} — ${grDate(date)} στις ${time}${desc?" · "+desc:""}${extra?" · "+extra:""}`,"auto",c.name);
     toast("Το ραντεβού καταχωρήθηκε στο ιστορικό.");
   }else{
@@ -1346,7 +1409,7 @@ function renderHistory(){
     <button class="btn danger sm" data-delh="${h.id}">✕</button></li>`).join("")}</ul>`;
 }
 
-let dayCur=todayISO(), wkCur=mondayOf(new Date()), mCur=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let dayCur=todayISO(), wkCur=new Date(), mCur=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 const START_H=8, END_H=21;
 const dayList=()=>apptsSorted().filter(a=>a.date===dayCur);
 const weekList=()=>{ const s=iso(wkCur), e=iso(addDays(wkCur,6)); return apptsSorted().filter(a=>a.date>=s&&a.date<=e); };
@@ -1379,13 +1442,13 @@ function renderDay(){
 }
 function renderWeek(){
   const s=new Date(wkCur), e=addDays(s,6);
-  $("#weekTitle").textContent=`Εβδομάδα ${grDate(iso(s))} – ${grDate(iso(e))}`;
+  $("#weekTitle").textContent=`7 ημέρες: ${grDate(iso(s))} – ${grDate(iso(e))}`;
   let html="";
   for(let i=0;i<7;i++){
-    const key=iso(addDays(s,i));
+    const dd=addDays(s,i), key=iso(dd);
     const list=apptsSorted().filter(a=>a.date===key);
     html+=`<div class="wk-day">
-      <div class="wk-day-h ${key===todayISO()?"today":""}"><b>${DOW[i]}</b><span class="muted mono">${grDate(key)}</span><span class="cnt">${list.length?list.length+" ραντεβού":"—"}</span></div>
+      <div class="wk-day-h ${key===todayISO()?"today":""}"><b>${DOW[dowIdx(dd)]}</b><span class="muted mono">${grDate(key)}</span><span class="cnt">${list.length?list.length+" ραντεβού":"—"}</span></div>
       ${list.length?list.map(a=>{const c=clientOf(a);return `<div class="wk-row ${a.status==="cancelled"?"canc":""}">
         <div class="tm mono">${esc(a.time)}</div>
         <div class="info">
@@ -1520,6 +1583,15 @@ function mailTemplates(c,a){
       s:a?`Υπενθύμιση ραντεβού — ${grDate(a.date)} ${a.time}`:"Υπενθύμιση ραντεβού",
       b:`Αγαπητέ/ή ${c.name},\n\nΥπενθύμιση για το ραντεβού μας${a?` (${when})`:""}.\n\nΠαραμένω στη διάθεσή σας.${SIGN}`
     },
+    polite:{
+      s:a?`Ευγενική υπενθύμιση ραντεβού — ${grDate(a.date)} στις ${a.time}`:"Ευγενική υπενθύμιση ραντεβού",
+      b:`Αξιότιμε/η κύριε/κυρία ${c.name},\n\n`
+       +`Σας υπενθυμίζουμε ευγενικά ότι το ραντεβού μας έχει οριστεί${a?` για ${when}`:""}.\n\n`
+       +`Σε περίπτωση που προκύψει οποιαδήποτε αλλαγή, θα σας παρακαλούσαμε να μας ενημερώσετε τουλάχιστον δύο (2) ημέρες νωρίτερα, ώστε να αναπροσαρμόσουμε ανάλογα το πρόγραμμα.\n\n`
+       +`Στοιχεία επικοινωνίας που τηρούμε για εσάς: ${c.phone||"—"}\n`
+       +`Εάν κάτι δεν είναι σωστό, ενημερώστε μας για να το διορθώσουμε.\n\n`
+       +`Σας ευχαριστούμε για τη συνεργασία.${SIGN}`
+    },
     blank:{ s:"", b:`Αγαπητέ/ή ${c.name},\n\n${SIGN}` }
   };
 }
@@ -1532,8 +1604,9 @@ function openMail(clientId, apptId){
     : apptsOf(c.id).find(x=>x.date>=todayISO()&&x.status==="scheduled");
   mailDialog(c,a);
 }
-function mailDialog(c,a){
+function mailDialog(c,a,pre){
   const T=mailTemplates(c,a), cur=lastMailer();
+  const P=(pre&&T[pre])?pre:"confirm";
 
   $("#modal").innerHTML=`
     <div class="modal-h">
@@ -1544,18 +1617,19 @@ function mailDialog(c,a){
       <div class="field" style="margin:0">
         <label for="mlTpl">Πρότυπο</label>
         <select id="mlTpl">
-          <option value="confirm">Επιβεβαίωση ραντεβού${a?` (${grDate(a.date)} ${a.time})`:""}</option>
-          <option value="remind">Υπενθύμιση ραντεβού</option>
-          <option value="blank">Κενό μήνυμα</option>
+          <option value="confirm"${P==="confirm"?" selected":""}>Επιβεβαίωση ραντεβού${a?` (${grDate(a.date)} ${a.time})`:""}</option>
+          <option value="polite"${P==="polite"?" selected":""}>Ευγενική υπενθύμιση (2 ημέρες προειδοποίηση)</option>
+          <option value="remind"${P==="remind"?" selected":""}>Υπενθύμιση ραντεβού</option>
+          <option value="blank"${P==="blank"?" selected":""}>Κενό μήνυμα</option>
         </select>
       </div>
       <div class="field" style="margin:0">
         <label for="mlSub">Θέμα</label>
-        <input id="mlSub" value="${esc(T.confirm.s)}">
+        <input id="mlSub" value="${esc(T[P].s)}">
       </div>
       <div class="field" style="margin:0">
         <label for="mlBody">Κείμενο</label>
-        <textarea id="mlBody" style="min-height:180px">${esc(T.confirm.b)}</textarea>
+        <textarea id="mlBody" style="min-height:180px">${esc(T[P].b)}</textarea>
       </div>
       <div>
         <div class="sec-t">Με τι θέλετε να το στείλετε;</div>
@@ -1589,7 +1663,7 @@ const ALERT_MIN=15;
 const alerted=(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("bcsa-alerted")||"[]")); }catch(e){ return new Set(); } })();
 function markAlerted(id){ alerted.add(id); try{ localStorage.setItem("bcsa-alerted",JSON.stringify(Array.from(alerted).slice(-500))); }catch(e){} }
 
-function beep(){ bell(4); }
+function beep(){ bell(5); }
 function bell(seconds){
   try{
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
@@ -1631,12 +1705,20 @@ async function askNotif(){
 
 /* Παράθυρο ειδοποίησης — απαιτεί «Ενημερώθηκα» */
 const alertQ=[];
-function alertModal(a,mins){
+const minsUntil=(d,t)=>{ const dt=parseISO(d), p=String(t||"").split(":"); dt.setHours(+p[0]||0,+p[1]||0,0,0); return (dt-new Date())/60000; };
+
+function alertModal(a,mins,rem){
   const c=clientOf(a), m=money(a.clientId);
+  const isRem=!!rem;
   $("#modal").className="modal alarm";
   $("#modal").innerHTML=`
     <div class="modal-h">
-      <div><h3>⏰ Ραντεβού σε ${mins} λεπτά</h3><div class="muted">${DOW[dowIdx(parseISO(a.date))]} ${grDate(a.date)} · <b>${esc(a.time)}</b></div></div>
+      <div>
+        <h3>${isRem?"🔔 Ευγενική υπενθύμιση":"⏰ Ραντεβού"} σε ${mins} λεπτά</h3>
+        <div class="muted">${isRem
+          ? `Υπενθύμιση: <b>${grDate(rem.date)} ${esc(rem.time)}</b> · Ραντεβού: ${DOW[dowIdx(parseISO(a.date))]} ${grDate(a.date)} <b>${esc(a.time)}</b>`
+          : `${DOW[dowIdx(parseISO(a.date))]} ${grDate(a.date)} · <b>${esc(a.time)}</b>`}</div>
+      </div>
     </div>
     <div class="modal-b">
       <div class="cards">
@@ -1644,43 +1726,101 @@ function alertModal(a,mins){
         <div class="stat"><div class="v mono" style="font-size:19px">${esc(c.phone||"—")}</div><div class="l">Τηλέφωνο</div></div>
         <div class="stat"><div class="v mono" style="font-size:19px">${eur(num(a.cost))}</div><div class="l">${a.paid?"Εξοφλήθηκε":"Κόστος — εκκρεμεί"}</div></div>
       </div>
-      ${(a.services||[]).length?`<div><div class="sec-t">Υπηρεσίες</div><div class="tagline">${a.services.map(s=>`<span class="stag">${esc(s)}</span>`).join("")}</div></div>`:""}
+      ${(a.services||[]).length?`<div><div class="sec-t">Υπηρεσίες</div><div class="tagline">${a.services.map(x=>`<span class="stag">${esc(x)}</span>`).join("")}</div></div>`:""}
       ${a.description?`<div><div class="sec-t">Περιγραφή</div><div class="desc" style="max-width:none">${esc(a.description)}</div></div>`:""}
       <div class="muted">Σύνολο πληρωμών πελάτη μέχρι σήμερα: <b>${eur(m.paid)}</b>${m.due?` · Υπόλοιπο: <b>${eur(m.due)}</b>`:""}</div>
-      <div class="row-end"><button class="btn brass" id="ackBtn" style="padding:12px 26px;font-size:15px">Ενημερώθηκα</button></div>
+      <div class="row-end">
+        ${hasEmail(c)?`<button class="btn ghost" id="alMail">✉ Ευγενική υπενθύμιση</button>`:""}
+        <button class="btn brass" id="ackBtn" style="padding:12px 26px;font-size:15px">Ενημερώθηκα</button>
+      </div>
     </div>`;
   $("#back").classList.add("on");
+  const mb=$("#alMail");
+  if(mb) mb.onclick=()=>{ $("#modal").className="modal"; mailDialog(c,a,"polite"); };
   const btn=$("#ackBtn"); btn.focus();
   btn.onclick=async()=>{
     $("#modal").className="modal";
     closeModal();
-    logIt(`Επιβεβαίωση ειδοποίησης (Ενημερώθηκα): ${a.clientName} — ${grDate(a.date)} ${a.time}`,"sys",a.clientName);
+    logIt(`Επιβεβαίωση ${isRem?"υπενθύμισης":"ειδοποίησης"} (Ενημερώθηκα): ${a.clientName} — ${grDate(a.date)} ${a.time}`,"sys",a.clientName);
     await persist();
-    if(alertQ.length){ const n=alertQ.shift(); alertModal(n.a,n.mins); }
+    if(alertQ.length){ const nx=alertQ.shift(); alertModal(nx.a,nx.mins,nx.rem); }
   };
 }
-function fireAlert(a,mins){
-  bell(4);
-  try{ if(notifState()==="granted") new Notification(`Ραντεβού σε ${mins} λεπτά`,{body:`${a.time} — ${a.clientName}`,tag:a.id,requireInteraction:true}); }catch(e){}
-  if($("#back").classList.contains("on")) alertQ.push({a,mins});
-  else alertModal(a,mins);
-  logIt(`Ειδοποίηση 15΄ πριν: ${a.clientName} — ${grDate(a.date)} ${a.time}`,"sys",a.clientName);
+function fireAlert(a,mins,rem){
+  bell(5);
+  try{
+    if(notifState()==="granted") new Notification(
+      rem?`Ευγενική υπενθύμιση σε ${mins} λεπτά`:`Ραντεβού σε ${mins} λεπτά`,
+      {body:`${a.clientName} — ραντεβού ${grDate(a.date)} ${a.time}`, tag:(rem?a.id+":"+rem.id:a.id), requireInteraction:true});
+  }catch(e){}
+  if($("#back").classList.contains("on")) alertQ.push({a,mins,rem});
+  else alertModal(a,mins,rem);
+  logIt(`${rem?"Ευγενική υπενθύμιση":"Ειδοποίηση"} 15΄ πριν: ${a.clientName} — ${grDate(a.date)} ${a.time}`,"sys",a.clientName);
 }
 function checkAlerts(){
-  const now=new Date();
   let hit=false;
   DB.appointments.forEach(a=>{
-    if(a.status!=="scheduled"||alerted.has(a.id)) return;
-    const dt=parseISO(a.date), p=a.time.split(":");
-    dt.setHours(+p[0],+p[1],0,0);
-    const diff=(dt-now)/60000;
-    if(diff>0&&diff<=ALERT_MIN){ fireAlert(a,Math.max(1,Math.round(diff))); markAlerted(a.id); hit=true; }
+    if(a.status!=="scheduled") return;
+
+    if(a.date && a.time && !alerted.has(a.id)){
+      const d=minsUntil(a.date,a.time);
+      if(d>0 && d<=ALERT_MIN){ fireAlert(a,Math.max(1,Math.round(d)),null); markAlerted(a.id); hit=true; }
+    }
+
+    (a.reminders||[]).forEach(r=>{
+      if(!r.date || !r.time) return;
+      const k=a.id+":"+r.id;
+      if(alerted.has(k)) return;
+      const d=minsUntil(r.date,r.time);
+      if(d>0 && d<=ALERT_MIN){ fireAlert(a,Math.max(1,Math.round(d)),r); markAlerted(k); hit=true; }
+    });
   });
   if(hit) persist();
 }
 
 /* ---------- 7d. ΚΛΕΙΔΩΜΑ ΚΑΡΤΕΛΑΣ ΔΕΔΟΜΕΝΩΝ (ζητείται ΚΑΘΕ φορά) ---------- */
-/* Ο παλιός κωδικός της καρτέλας «Δεδομένα» καταργήθηκε — αντικαταστάθηκε από πραγματικό authentication. */
+let dataOpen=false;
+function askPass(){
+  $("#modal").innerHTML=`
+    <div class="modal-h">
+      <div><h3>🔒 Δεδομένα &amp; Excel</h3><div class="muted">Ζητείται κωδικός σε κάθε είσοδο στην καρτέλα.</div></div>
+      <button class="btn ghost sm" id="pX">✕</button>
+    </div>
+    <div class="modal-b">
+      <div class="field" style="margin:0">
+        <label for="pIn">Κωδικός πρόσβασης</label>
+        <input id="pIn" type="password" placeholder="••••••••" autocomplete="off">
+      </div>
+      <div id="pErr"></div>
+      <div class="row-end">
+        <button class="btn ghost" id="pCancel">Άκυρο</button>
+        <button class="btn brass" id="pGo">Ξεκλείδωμα</button>
+      </div>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#pIn").focus();
+
+  const done=async()=>{
+    const v=($("#pIn").value||"").trim();
+    if(!v){ $("#pIn").focus(); return; }
+    $("#pGo").disabled=true;
+    $("#pErr").innerHTML='<div class="flag match"><span>⏳</span><span>Έλεγχος…</span></div>';
+    let ok=false;
+    try{ const r=await sb.rpc("check_data_code",{p_code:v}); ok=(r.data===true); }catch(e){ ok=false; }
+    if(!ok){
+      $("#pErr").innerHTML='<div class="flag bad"><span>!</span><span>Λανθασμένος κωδικός.</span></div>';
+      $("#pIn").value=""; $("#pIn").focus(); $("#pGo").disabled=false;
+      logIt("Αποτυχημένη προσπάθεια πρόσβασης στην καρτέλα Δεδομένα & Excel","sys","");
+      persist();
+      return;
+    }
+    dataOpen=true; closeModal(); go("data");
+  };
+  $("#pGo").onclick=done;
+  $("#pIn").onkeydown=e=>{ if(e.key==="Enter") done(); };
+  $("#pX").onclick=closeModal;
+  $("#pCancel").onclick=closeModal;
+}
 
 /* ---------- 7e. ΟΘΟΝΗ ΕΙΣΟΔΟΥ / ΕΓΓΡΑΦΗΣ ---------- */
 const gMsg =(el,txt,bad)=>{ const e=$(el); if(e) e.innerHTML = txt
@@ -1808,6 +1948,8 @@ async function showGate(){
 
 /* ---------- 8. NAV ---------- */
 function go(v){
+  if(v!=="data") dataOpen=false;
+  if(v==="data" && !dataOpen){ askPass(); return; }
   $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.view===v));
   $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));
   renderAll(); window.scrollTo({top:0});
@@ -1859,9 +2001,9 @@ function bind(){
   $("#dayNext").onclick=()=>{ dayCur=iso(addDays(parseISO(dayCur),1)); renderDay(); };
   $("#dayToday").onclick=()=>{ dayCur=todayISO(); renderDay(); };
   $("#dayPick").onchange=e=>{ if(e.target.value){ dayCur=e.target.value; renderDay(); } };
-  $("#wkPrev").onclick=()=>{ wkCur=addDays(wkCur,-7); renderWeek(); };
-  $("#wkNext").onclick=()=>{ wkCur=addDays(wkCur,7); renderWeek(); };
-  $("#wkToday").onclick=()=>{ wkCur=mondayOf(new Date()); renderWeek(); };
+  $("#wkPrev").onclick=()=>{ wkCur=addDays(wkCur,-1); renderWeek(); };
+  $("#wkNext").onclick=()=>{ wkCur=addDays(wkCur,1); renderWeek(); };
+  $("#wkToday").onclick=()=>{ wkCur=new Date(); renderWeek(); };
   $("#mPrev").onclick=()=>{ mCur=new Date(mCur.getFullYear(),mCur.getMonth()-1,1); renderMonth(); };
   $("#mNext").onclick=()=>{ mCur=new Date(mCur.getFullYear(),mCur.getMonth()+1,1); renderMonth(); };
   $("#mToday").onclick=()=>{ mCur=new Date(new Date().getFullYear(),new Date().getMonth(),1); renderMonth(); };
@@ -1898,6 +2040,17 @@ function bind(){
 
   $("#syncChip").onclick=()=>{ if(!FS_OK){ go("data"); return; } enableSync(); };
   $("#btnOut").onclick=doLogout;
+  $("#btnRemAdd").onclick=addRem;
+  $("#btnRemMail").onclick=()=>{
+    const nm=$("#fName").value.trim(), ph=$("#fPhone").value.trim();
+    if(!nm){ toast("Συμπληρώστε πρώτα το ονοματεπώνυμο του πελάτη.",true); $("#fName").focus(); return; }
+    let c=findClient(nm,ph);
+    if(!c) c={id:"",name:nm,email:$("#fEmail").value.trim(),phone:ph};
+    if(!hasEmail(c)){ toast("Ο πελάτης δεν έχει email — συμπληρώστε το πεδίο Email.",true); $("#fEmail").focus(); return; }
+    const d=$("#fDate").value, t=normTime($("#fTime").value.trim());
+    if(!d||!t){ toast("Χρειάζεται ημερομηνία και ώρα ραντεβού για το κείμενο του email.",true); return; }
+    mailDialog(c,{date:d,time:t},"polite");
+  };
   $("#cloudChip").onclick=()=>{ pushToCloud(); toast("Συγχρονισμός με cloud…"); };
   $$(".tab").forEach(t=>t.addEventListener("click",()=>go(t.dataset.view)));
   $("#back").addEventListener("click",e=>{ if(e.target.id==="back") closeModal(); });
@@ -1953,6 +2106,7 @@ function bind(){
         const c=clientOf(a);
         closeModal(); go("clients");
         $("#editApptId").value=a.id;
+        formRems=(a.reminders||[]).map(r=>({id:r.id||uid(),date:r.date,time:r.time})); renderRems();
         $("#fName").value=a.clientName; $("#fEmail").value=c.email||""; $("#fPhone").value=c.phone||"";
         $("#fDesc").value=a.description||""; $("#descCnt").textContent=`${(a.description||"").length} / 1000`;
         $("#fDate").value=a.date; $("#fTime").value=a.time;
