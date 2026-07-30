@@ -229,7 +229,7 @@
     </div>
     <div id="gErr"></div>
     <button class="btn brass" id="gGo" style="width:100%;margin-top:12px;padding:11px">Είσοδος</button>
-    <p class="glock">🔒 Η βάση είναι κρυπτογραφημένη (AES-GCM 256-bit). Χωρίς σωστό κωδικό, τα δεδομένα δεν αποκρυπτογραφούνται.</p>
+    <p class="glock"><span style="display:inline-flex;align-items:center;gap:8px;justify-content:center">🔒 Κρυπτογραφημένη βάση (AES-GCM 256-bit)<button id="gInfo" title="Όροι χρήσης &amp; πρόσβασης" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--brass);background:none;color:var(--brass);font-weight:700;font-size:12px;cursor:pointer;line-height:1;padding:0">!</button></span><br><span style="display:block;margin-top:6px">Χωρίς σωστό κωδικό, τα δεδομένα δεν αποκρυπτογραφούνται.</span></p>
   </div>
 </div>
 
@@ -453,6 +453,14 @@
 
   <!-- ΔΕΔΟΜΕΝΑ -->
   <section class="view" id="v-data">
+    <div class="panel" style="margin-bottom:22px" id="admPwPanel">
+      <div class="panel-h"><h2>Διαχείριση κωδικών εισόδου</h2><span class="sub">Μόνο διαχειριστής</span></div>
+      <div class="panel-b"><div id="pwAdmin"></div></div>
+    </div>
+    <div class="panel" style="margin-bottom:22px" id="admUsersPanel">
+      <div class="panel-h"><h2>Εποπτεία χρηστών &amp; Εξαγωγή</h2><span class="sub">Μόνο διαχειριστής</span></div>
+      <div class="panel-b"><div id="usersAdmin"></div></div>
+    </div>
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Στοιχεία επιχείρησης</h2><span class="sub">Επωνυμία, λογότυπο, τύπος</span></div>
       <div class="panel-b"><div id="bizBox"></div></div>
@@ -495,7 +503,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v3.1 · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.0 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -994,8 +1002,12 @@ function applyBranding(){
     document.title=(p.brand?p.brand:"BCSA")+" — CRM";
   }catch(e){}
 }
+const scopeId=()=>currentUser?currentUser.id:"u_admin";
+const myNames=()=>new Set(mineC().map(c=>nz(c.name)));
+const mineC=()=>DB.clients.filter(c=>(c.owner||"u_admin")===scopeId());
+const mineA=()=>DB.appointments.filter(a=>(a.owner||"u_admin")===scopeId());
 const apptsOf=id=>DB.appointments.filter(a=>a.clientId===id).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-const apptsSorted=()=>DB.appointments.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+const apptsSorted=()=>mineA().slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
 const clientOf=a=>DB.clients.find(c=>c.id===a.clientId)||{};
 const num=v=>{ const n=parseFloat(String(v==null?"":v).replace(",",".")); return isFinite(n)&&n>0?Math.round(n*100)/100:0; };
 const eur=n=>(n||0).toLocaleString("el-GR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
@@ -1015,13 +1027,19 @@ function sheetAppts(list,name){return {name:name||"Ραντεβού",widths:[12,
 function sheetHist(list){const k={auto:"Αυτόματη",manual:"Χειροκίνητη",sys:"Σύστημα"};return {name:"Ιστορικό",widths:[18,14,26,70],rows:[
   ["Ημ/νία & Ώρα","Τύπος","Πελάτης","Εγγραφή"],
   ...list.map(h=>[stamp(h.ts),k[h.kind]||h.kind,h.client||"",h.text])]};}
-const allSheets=()=>[sheetClients(DB.clients),sheetAppts(apptsSorted()),sheetHist(DB.history)];
+const allSheets=()=>[sheetClients(mineC()),sheetAppts(apptsSorted()),sheetHist(DB.history.filter(h=>myNames().has(nz(h.client))||!h.client))];
 
 /* ---------- 4. ΚΩΔΙΚΟΙ & ΚΡΥΠΤΟΓΡΑΦΗΣΗ ---------- */
 /* Είσοδος: Vagelhs1990 (μόνιμος) · volos1234 (έως 30/08/2026)
    Δεδομένα & Excel: bcsa1234 · User1234 (ζητούνται ΚΑΘΕ φορά)
    Η βάση αποθηκεύεται κρυπτογραφημένη (AES-GCM 256, PBKDF2 150k). */
-const LOGIN_PW=[{p:"Vagelhs1990",until:null},{p:"volos1234",until:"2026-08-30"},{p:"ksanthi2026",until:"2026-09-30"}];
+/* Αρχικοί (bootstrap) κωδικοί — μετά τη 1η εκκίνηση ζουν κρυπτογραφημένα στη βάση
+   και τους διαχειρίζεσαι από: Δεδομένα & Excel → Διαχείριση κωδικών (μόνο ο διαχειριστής). */
+const BOOTSTRAP_PW=[
+  {id:"u_admin", label:"Διαχειριστής (Ε. Γκούλιος)", p:"Vagelhs1990", until:null, admin:true},
+  {id:"u_volos", label:"Βόλος",  p:"volos1234",   until:"2026-08-30", admin:false},
+  {id:"u_ksan",  label:"Ξάνθη",  p:"ksanthi2026", until:"2026-09-30", admin:false}
+];
 const DATA_PW=["bcsa1234","User1234"];
 const KEY="bcsa-crm", FOLDER="CRM_bcsa_Information";
 
@@ -1030,41 +1048,50 @@ const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
 function b64e(u){ let s=""; const CH=0x8000; for(let i=0;i<u.length;i+=CH) s+=String.fromCharCode.apply(null,u.subarray(i,i+CH)); return btoa(s); }
 function b64d(s){ const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
 
-let sessionPw=null, dekKey=null, vaultSalt=null, vaultWraps=null;
+let sessionPw=null, dekKey=null, dekRaw=null, vaultSalt=null, vaultWraps=null;
+let currentUser=null;                 // {id,label,admin,until}
+const isAdmin=()=>!!(currentUser&&currentUser.admin);
 
 async function deriveKEK(pw,salt){
   const km=await crypto.subtle.importKey("raw",TE.encode(pw),"PBKDF2",false,["deriveKey"]);
   return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:150000,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
 }
-async function createVault(){
+async function wrapFor(pwEntry,salt,dek){
+  const kek=await deriveKEK(pwEntry.p,salt), iv=rnd(12);
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kek,dek));
+  return {id:pwEntry.id, label:pwEntry.label, until:pwEntry.until||null, admin:!!pwEntry.admin, iv:b64e(iv), ct:b64e(ct)};
+}
+async function createVault(pwList){
   vaultSalt=rnd(16);
-  const dek=rnd(32);
+  dekRaw=rnd(32);
   vaultWraps=[];
-  for(const L of LOGIN_PW){
-    const kek=await deriveKEK(L.p,vaultSalt), iv=rnd(12);
-    const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kek,dek));
-    vaultWraps.push({iv:b64e(iv),ct:b64e(ct)});
-  }
-  dekKey=await crypto.subtle.importKey("raw",dek,{name:"AES-GCM"},false,["encrypt","decrypt"]);
+  for(const L of (pwList||BOOTSTRAP_PW)) vaultWraps.push(await wrapFor(L,vaultSalt,dekRaw));
+  dekKey=await crypto.subtle.importKey("raw",dekRaw,{name:"AES-GCM"},false,["encrypt","decrypt"]);
 }
 async function envelope(){
   const iv=rnd(12);
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},dekKey,TE.encode(JSON.stringify(DB))));
-  return {app:"BCSA CRM",v:2,enc:"AES-GCM-256",salt:b64e(vaultSalt),wraps:vaultWraps,iv:b64e(iv),data:b64e(ct),saved:new Date().toISOString()};
+  return {app:"BCSA CRM",v:3,enc:"AES-GCM-256",salt:b64e(vaultSalt),wraps:vaultWraps,iv:b64e(iv),data:b64e(ct),saved:new Date().toISOString()};
 }
+/* Επιστρέφει {db, dekRaw, salt, wraps, matched} ή null */
 async function openEnvelope(env,pw){
-  if(!env||env.v!==2||!env.wraps) return null;
+  if(!env||!env.wraps||!(env.v===2||env.v===3)) return null;
   const salt=b64d(env.salt), kek=await deriveKEK(pw,salt);
-  let raw=null;
+  let raw=null, matched=null;
   for(const w of env.wraps){
-    try{ raw=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct))); break; }catch(e){}
+    try{ raw=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct))); matched=w; break; }catch(e){}
   }
   if(!raw) return null;
   const key=await crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["encrypt","decrypt"]);
   try{
     const js=TD.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(env.iv)},key,b64d(env.data)));
-    return {db:JSON.parse(js),key,salt,wraps:env.wraps};
+    return {db:JSON.parse(js),key,dekRaw:raw,salt,wraps:env.wraps,matched,version:env.v};
   }catch(e){ return null; }
+}
+/* Ξαναφτιάχνει όλα τα wraps από την τρέχουσα λίστα κωδικών (rewrap του ίδιου DEK) */
+async function rewrapAll(pwList){
+  vaultWraps=[];
+  for(const L of pwList) vaultWraps.push(await wrapFor(L,vaultSalt,dekRaw));
 }
 
 const Store={
@@ -1255,12 +1282,12 @@ function showSetup(reconnect){
 /* ---------- 5. ΦΟΡΜΑ & ΤΑΥΤΟΠΟΙΗΣΗ ΠΕΛΑΤΗ ---------- */
 /* Ταυτότητα πελάτη = ΟΝΟΜΑ + ΤΗΛΕΦΩΝΟ. Το email είναι προαιρετικό και δεν ελέγχεται. */
 const hasEmail=c=>!!(c&&c.email&&c.email.indexOf("@")>0);
-const findByEmail=e=>{const k=nz(e);return (k&&k.indexOf("@")>0)?DB.clients.find(c=>nz(c.email)===k):null;};
+const findByEmail=e=>{const k=nz(e);return (k&&k.indexOf("@")>0)?mineC().find(c=>nz(c.email)===k):null;};
 
 function findClient(name,phone){
   const n=nz(name), p=digits(phone);
   if(!n) return null;
-  const same=DB.clients.filter(c=>nz(c.name)===n);
+  const same=mineC().filter(c=>nz(c.name)===n);
   if(!same.length) return null;
   if(!p) return same[0];
   const exact=same.find(c=>digits(c.phone)===p);
@@ -1294,7 +1321,7 @@ function clearSug(){ ["#sugName","#sugEmail","#sugPhone"].forEach(s=>{const el=$
 function checkForm(){
   const name=$("#fName").value, phone=$("#fPhone").value;
   const exist=findClient(name,phone);
-  const sameName=nz(name)?DB.clients.filter(c=>nz(c.name)===nz(name)):[];
+  const sameName=nz(name)?mineC().filter(c=>nz(c.name)===nz(name)):[];
   const fl=[];
   if(exist){
     const n=apptsOf(exist.id).length;
@@ -1310,7 +1337,7 @@ function suggestName(){
   const v=$("#fName").value.trim();
   if(v.length<2){ $("#sugName").innerHTML=""; checkForm(); return; }
   const k=nz(v);
-  const hits=DB.clients.filter(c=>nz(c.name).includes(k)).slice(0,6);
+  const hits=mineC().filter(c=>nz(c.name).includes(k)).slice(0,6);
   sugBox($("#sugName"),hits,hits.length?"Κλικ για συμπλήρωση τηλεφώνου και email":"");
   checkForm();
 }
@@ -1318,12 +1345,12 @@ function suggestEmail(){
   const v=$("#fEmail").value.trim();
   if(v.length<3){ $("#sugEmail").innerHTML=""; return; }
   const k=nz(v);
-  sugBox($("#sugEmail"),DB.clients.filter(c=>hasEmail(c)&&nz(c.email).includes(k)).slice(0,5),"");
+  sugBox($("#sugEmail"),mineC().filter(c=>hasEmail(c)&&nz(c.email).includes(k)).slice(0,5),"");
 }
 function suggestPhone(){
   const v=digits($("#fPhone").value);
   if(v.length<3){ $("#sugPhone").innerHTML=""; checkForm(); return; }
-  sugBox($("#sugPhone"),DB.clients.filter(c=>digits(c.phone)&&digits(c.phone).includes(v)).slice(0,5),"");
+  sugBox($("#sugPhone"),mineC().filter(c=>digits(c.phone)&&digits(c.phone).includes(v)).slice(0,5),"");
   checkForm();
 }
 /* Υπηρεσίες στη φόρμα */
@@ -1393,7 +1420,7 @@ async function addEntry(){
     if(!date&&desc&&desc!==c.notes){ c.notes=desc; ch.push("σημειώσεις"); }
     if(ch.length) logIt(`Ενημέρωση στοιχείων πελάτη (${ch.join(", ")}): ${c.name}`,"sys",c.name);
   }else{
-    c={id:uid(),name,email,phone,notes:date?"":desc,createdAt:Date.now()};
+    c={id:uid(),owner:scopeId(),name,email,phone,notes:date?"":desc,createdAt:Date.now()};
     DB.clients.push(c);
     logIt(`Νέος πελάτης στη βάση: ${name}${phone?` (${phone})`:""}`,"sys",name);
   }
@@ -1408,9 +1435,9 @@ async function addEntry(){
       toast("Το ραντεβού ενημερώθηκε.");
     }
   }else if(date){
-    const clash=DB.appointments.find(a=>a.date===date&&a.time===time&&a.status==="scheduled");
+    const clash=mineA().find(a=>a.date===date&&a.time===time&&a.status==="scheduled");
     if(clash&&!confirm(`Υπάρχει ήδη ραντεβού στις ${grDate(date)} ${time} (${clash.clientName}). Να καταχωρηθεί κι αυτό;`)) return;
-    DB.appointments.push({id:uid(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,status:"scheduled",createdAt:Date.now()});
+    DB.appointments.push({id:uid(),owner:scopeId(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,status:"scheduled",createdAt:Date.now()});
     logIt(`Νέο ραντεβού: ${c.name} — ${grDate(date)} στις ${time}${desc?" · "+desc:""}${extra?" · "+extra:""}`,"auto",c.name);
     toast("Το ραντεβού καταχωρήθηκε στο ιστορικό.");
   }else{
@@ -1458,12 +1485,12 @@ function renderAppts(){
 }
 function filteredClients(){
   const q=nz($("#qClient").value);
-  return DB.clients.filter(c=>!q||nz(c.name+" "+(c.email||"")+" "+(c.phone||"")+" "+(c.notes||"")).includes(q)||(digits(q)&&digits(c.phone).includes(digits(q))))
+  return mineC().filter(c=>!q||nz(c.name+" "+(c.email||"")+" "+(c.phone||"")+" "+(c.notes||"")).includes(q)||(digits(q)&&digits(c.phone).includes(digits(q))))
     .sort((a,b)=>a.name.localeCompare(b.name,"el"));
 }
 function renderClients(){
   const rows=filteredClients();
-  $("#clientNames").innerHTML=DB.clients.map(c=>`<option value="${esc(c.name)}"></option>`).join("");
+  $("#clientNames").innerHTML=mineC().map(c=>`<option value="${esc(c.name)}"></option>`).join("");
   if(!rows.length){ $("#clientTable").innerHTML='<div class="empty"><strong>Κανένας πελάτης</strong>Κάθε όνομα που καταχωρείτε αποθηκεύεται εδώ αυτόματα.</div>'; return; }
   $("#clientTable").innerHTML=`<table><thead><tr><th>Ονοματεπώνυμο</th><th>Email</th><th>Τηλέφωνο</th><th>Επόμενο</th><th style="text-align:center">Ραντεβού</th><th>Πληρωμές</th><th></th></tr></thead><tbody>${rows.map(c=>{
     const all=apptsOf(c.id), next=all.find(a=>a.date>=todayISO()&&a.status==="scheduled");
@@ -1551,7 +1578,7 @@ function renderMonth(){
     const n=i-pad+1;
     if(n<1||n>days){ html+='<div class="cell off"></div>'; continue; }
     const key=iso(new Date(mCur.getFullYear(),mCur.getMonth(),n));
-    const list=DB.appointments.filter(a=>a.date===key);
+    const list=mineA().filter(a=>a.date===key);
     html+=`<div class="cell ${key===todayISO()?"today":""}" data-day="${key}">
       <div class="num mono">${n}</div>
       <div class="load">${list.slice(0,4).map(a=>`<div class="bar ${a.status==="done"?"done":a.status==="cancelled"?"canc":""}"></div>`).join("")}</div>
@@ -1560,7 +1587,7 @@ function renderMonth(){
   $("#calGrid").innerHTML=html;
 }
 function renderMoney(){
-  const rows=DB.clients.map(c=>({c,m:money(c.id)})).filter(x=>x.m.total>0).sort((a,b)=>b.m.total-a.m.total);
+  const rows=mineC().map(c=>({c,m:money(c.id)})).filter(x=>x.m.total>0).sort((a,b)=>b.m.total-a.m.total);
   if(!rows.length){ $("#moneyTable").innerHTML='<div class="empty"><strong>Καμία χρέωση</strong>Συμπληρώστε κόστος στα ραντεβού για να εμφανιστούν σύνολα.</div>'; return; }
   const T=rows.reduce((s,x)=>({t:s.t+x.m.total,p:s.p+x.m.paid,d:s.d+x.m.due}),{t:0,p:0,d:0});
   $("#moneyTable").innerHTML=`<table><thead><tr><th>Πελάτης</th><th style="text-align:right">Σύνολο χρεώσεων</th><th style="text-align:right">Πληρωμένα</th><th style="text-align:right">Υπόλοιπο</th></tr></thead><tbody>${
@@ -1585,15 +1612,15 @@ function renderSvcAdmin(){
 function renderStats(){
   const t=todayISO();
   $("#stats").innerHTML=`
-    <div class="stat"><div class="v mono">${DB.clients.length}</div><div class="l">Πελάτες</div></div>
-    <div class="stat"><div class="v mono">${DB.appointments.length}</div><div class="l">Ραντεβού συνολικά</div></div>
-    <div class="stat"><div class="v mono">${DB.appointments.filter(a=>a.date>=t&&a.status==="scheduled").length}</div><div class="l">Επερχόμενα</div></div>
-    <div class="stat"><div class="v mono">${DB.appointments.filter(a=>a.status==="done").length}</div><div class="l">Ολοκληρωμένα</div></div>
+    <div class="stat"><div class="v mono">${mineC().length}</div><div class="l">Πελάτες</div></div>
+    <div class="stat"><div class="v mono">${mineA().length}</div><div class="l">Ραντεβού συνολικά</div></div>
+    <div class="stat"><div class="v mono">${mineA().filter(a=>a.date>=t&&a.status==="scheduled").length}</div><div class="l">Επερχόμενα</div></div>
+    <div class="stat"><div class="v mono">${mineA().filter(a=>a.status==="done").length}</div><div class="l">Ολοκληρωμένα</div></div>
     <div class="stat"><div class="v mono">${DB.history.length}</div><div class="l">Εγγραφές ιστορικού</div></div>
-    <div class="stat"><div class="v mono" style="font-size:20px">${eur(DB.appointments.filter(a=>a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Συνολικές εισπράξεις</div></div>
-    <div class="stat"><div class="v mono" style="font-size:20px">${eur(DB.appointments.filter(a=>!a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Εκκρεμείς πληρωμές</div></div>`;
+    <div class="stat"><div class="v mono" style="font-size:20px">${eur(mineA().filter(a=>a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Συνολικές εισπράξεις</div></div>
+    <div class="stat"><div class="v mono" style="font-size:20px">${eur(mineA().filter(a=>!a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Εκκρεμείς πληρωμές</div></div>`;
   $("#dbStamp").textContent=DB.updated?"Τελευταία ενημέρωση: "+stamp(DB.updated):"Καμία εγγραφή ακόμη";
-  $("#nClients").textContent=DB.clients.length;
+  $("#nClients").textContent=mineC().length;
   $("#nHist").textContent=DB.history.length;
 }
 function renderBiz(){
@@ -1644,7 +1671,124 @@ function renderBiz(){
     DB.services=svcForType($("#bzType").value); renderSvcForm([]); await persist(); toast("Οι υπηρεσίες επαναφέρθηκαν.");
   };
 }
-function renderAll(){ renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); updateChip(); updateNotifChip(); }
+/* ---------- ADMIN: Διαχείριση κωδικών ---------- */
+function userStats(uid){
+  const cs=DB.clients.filter(c=>(c.owner||"u_admin")===uid);
+  const as=DB.appointments.filter(a=>(a.owner||"u_admin")===uid);
+  const done=as.filter(a=>a.status!=="cancelled");
+  const paid=done.filter(a=>a.paid).reduce((s,a)=>s+num(a.cost),0);
+  const total=done.reduce((s,a)=>s+num(a.cost),0);
+  return {clients:cs.length,appts:as.length,paid,total,due:Math.round((total-paid)*100)/100};
+}
+function renderPwAdmin(){
+  const wrap=$("#admPwPanel"), box=$("#pwAdmin"); if(!box) return;
+  if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
+  box.innerHTML=`
+    <table><thead><tr><th>Ετικέτα / Χρήστης</th><th>Ρόλος</th><th>Λήξη</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
+      vaultWraps.map(w=>{
+        const exp=w.until&&todayISO()>w.until;
+        return `<tr>
+          <td class="name">${esc(w.label||w.id)}</td>
+          <td>${w.admin?'<span class="pill p-sched">Διαχειριστής</span>':'<span class="muted">Χρήστης</span>'}</td>
+          <td class="mono">${w.until?grDate(w.until):"—"}</td>
+          <td>${exp?'<span class="pill p-canc">Έληξε</span>':'<span class="pill p-done">Ενεργός</span>'}</td>
+          <td style="white-space:nowrap;text-align:right">
+            <button class="btn ghost sm" data-pwedit="${w.id}">Αλλαγή</button>
+            ${w.id!==currentUser.id&&!w.admin?`<button class="btn danger sm" data-pwdel="${w.id}">✕</button>`:""}
+          </td></tr>`;
+      }).join("")
+    }</tbody></table>
+    <div style="border-top:1px solid var(--line-2);margin-top:14px;padding-top:14px">
+      <div class="sec-t">Προσθήκη νέου κωδικού</div>
+      <div class="two"><div class="field" style="margin:0"><label>Ετικέτα (π.χ. υποκατάστημα)</label><input id="npLabel" placeholder="π.χ. Καβάλα"></div>
+        <div class="field" style="margin:0"><label>Κωδικός</label><input id="npPass" placeholder="κωδικός εισόδου"></div></div>
+      <div class="two" style="margin-top:11px;align-items:end">
+        <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="npUntil" type="date"></div>
+        <button class="btn brass" id="npAdd">Προσθήκη κωδικού</button>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:10px">Οι κωδικοί κρυπτογραφούνται και ξεκλειδώνουν την ίδια βάση. Ο νέος χρήστης βλέπει <b>μόνο τα δικά του</b> δεδομένα· ο διαχειριστής έχει πρόσβαση σε όλα από την «Εποπτεία χρηστών».</p>`;
+  $("#npAdd").onclick=async()=>{
+    const label=$("#npLabel").value.trim()||"Χρήστης", pass=$("#npPass").value.trim(), until=$("#npUntil").value||null;
+    if(pass.length<4){ toast("Κωδικός τουλάχιστον 4 χαρακτήρων.",true); return; }
+    if(vaultWraps.length){
+      // έλεγχος διπλότυπου κωδικού
+      for(const w of vaultWraps){ try{ const kek=await deriveKEK(pass,vaultSalt); await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct)); toast("Ο κωδικός χρησιμοποιείται ήδη.",true); return; }catch(e){} }
+    }
+    const id="u_"+uid();
+    vaultWraps.push(await wrapFor({id,label,p:pass,until,admin:false},vaultSalt,dekRaw));
+    logIt(`Προσθήκη κωδικού χρήστη: ${label}${until?` (λήξη ${grDate(until)})`:""}`,"sys","");
+    await persist(); toast("Ο κωδικός προστέθηκε.");
+  };
+}
+function pwEditDialog(id){
+  const w=vaultWraps.find(x=>x.id===id); if(!w) return;
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Αλλαγή κωδικού</h3><div class="muted">${esc(w.label||w.id)}</div></div><button class="btn ghost sm" id="peX">✕</button></div>
+    <div class="modal-b">
+      <div class="field" style="margin:0"><label>Ετικέτα</label><input id="peLabel" value="${esc(w.label||"")}"></div>
+      <div class="field" style="margin:0"><label>Νέος κωδικός (κενό = χωρίς αλλαγή)</label><input id="pePass" placeholder="••••••••"></div>
+      <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="peUntil" type="date" value="${w.until||""}"></div>
+      <div id="peErr"></div>
+      <div class="row-end"><button class="btn ghost" id="peCancel">Άκυρο</button><button class="btn brass" id="peSave">Αποθήκευση</button></div>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#peX").onclick=closeModal; $("#peCancel").onclick=closeModal;
+  $("#peSave").onclick=async()=>{
+    const label=$("#peLabel").value.trim()||w.label, until=$("#peUntil").value||null, pass=$("#pePass").value.trim();
+    w.label=label; w.until=until;
+    if(pass){
+      if(pass.length<4){ $("#peErr").innerHTML='<div class="flag bad"><span>!</span><span>Κωδικός τουλάχιστον 4 χαρακτήρων.</span></div>'; return; }
+      const nw=await wrapFor({id:w.id,label,p:pass,until,admin:w.admin},vaultSalt,dekRaw);
+      Object.assign(w,nw);
+      if(w.id===currentUser.id) sessionPw=pass;
+    }
+    logIt(`Τροποποίηση κωδικού χρήστη: ${label}`,"sys","");
+    closeModal(); await persist(); toast("Ο κωδικός ενημερώθηκε.");
+  };
+}
+function renderUsers(){
+  const wrap=$("#admUsersPanel"), box=$("#usersAdmin"); if(!box) return;
+  if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
+  const rows=vaultWraps.map(w=>({w,s:userStats(w.id)}));
+  box.innerHTML=`
+    <table><thead><tr><th>Χρήστης</th><th style="text-align:center">Πελάτες</th><th style="text-align:center">Ραντεβού</th><th style="text-align:right">Εισπράξεις</th><th style="text-align:right">Υπόλοιπα</th><th></th></tr></thead><tbody>${
+      rows.map(r=>`<tr>
+        <td class="name">${esc(r.w.label||r.w.id)}${r.w.admin?' <span class="pill p-sched">admin</span>':''}</td>
+        <td class="mono" style="text-align:center">${r.s.clients}</td>
+        <td class="mono" style="text-align:center">${r.s.appts}</td>
+        <td class="mono money" style="text-align:right">${eur(r.s.paid)}</td>
+        <td class="mono money" style="text-align:right">${r.s.due?eur(r.s.due):"—"}</td>
+        <td style="text-align:right"><button class="btn ghost sm" data-uexp="${r.w.id}">Export</button></td>
+      </tr>`).join("")
+    }</tbody></table>
+    <div class="row-end" style="justify-content:flex-start;margin-top:14px">
+      <button class="btn brass" id="expAllUsers">Εξαγωγή ΟΛΩΝ των χρηστών (Excel)</button>
+    </div>
+    <p class="muted" style="margin-top:10px">Η εξαγωγή περιλαμβάνει: ονοματεπώνυμο, τηλέφωνο, email, συνολικά ποσά, υπηρεσίες/περιγραφή και ημερομηνία καταχώρισης — ανά χρήστη.</p>`;
+  $("#expAllUsers").onclick=()=>exportUsers(null);
+}
+/* Φύλλο εποπτείας: μία γραμμή ανά πελάτη με τα ζητούμενα πεδία */
+function sheetOverview(uid,label){
+  const cs=DB.clients.filter(c=>(c.owner||"u_admin")===uid);
+  const rows=[["Χρήστης","Ονοματεπώνυμο","Τηλέφωνο","Email","Σύνολο χρεώσεων","Πληρωμένα","Υπόλοιπο","Υπηρεσίες / Περιγραφή","Ημ. καταχώρισης"]];
+  cs.forEach(c=>{
+    const as=DB.appointments.filter(a=>a.clientId===c.id);
+    const svc=Array.from(new Set([].concat(...as.map(a=>a.services||[])))).join(", ");
+    const desc=as.map(a=>a.description).filter(Boolean).join(" | ");
+    const m=(()=>{ const d=as.filter(a=>a.status!=="cancelled"); const t=d.reduce((s,a)=>s+num(a.cost),0); const p=d.filter(a=>a.paid).reduce((s,a)=>s+num(a.cost),0); return {t,p,due:Math.round((t-p)*100)/100}; })();
+    rows.push([label,c.name,c.phone||"",c.email||"",m.t,m.p,m.due,[svc,desc].filter(Boolean).join(" · "),stamp(c.createdAt)]);
+  });
+  return {name:(label||"Χρήστης").slice(0,28),widths:[18,26,15,26,15,13,13,50,18],rows};
+}
+function exportUsers(onlyId){
+  const list = onlyId ? vaultWraps.filter(w=>w.id===onlyId) : vaultWraps;
+  const sheets=list.map(w=>sheetOverview(w.id,w.label||w.id));
+  const who = onlyId ? safeName(list[0].label||"user") : "OLOI";
+  download(`BCSA_Epopteia_${who}_${todayISO()}.xlsx`, xlsx(sheets));
+}
+function renderAll(){ renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
 function openClient(id){
@@ -1860,7 +2004,7 @@ function fireAlert(a,mins){
 function checkAlerts(){
   const now=new Date();
   let hit=false;
-  DB.appointments.forEach(a=>{
+  mineA().forEach(a=>{
     if(a.status!=="scheduled"||alerted.has(a.id)) return;
     const dt=parseISO(a.date), p=a.time.split(":");
     dt.setHours(+p[0],+p[1],0,0);
@@ -1907,49 +2051,107 @@ function askPass(){
 let dataPassOK=false;
 
 /* ---------- 7e. ΟΘΟΝΗ ΕΙΣΟΔΟΥ ---------- */
-function pwValid(pw){
-  const L=LOGIN_PW.find(x=>x.p===pw);
-  if(!L) return {ok:false,msg:"Λανθασμένος κωδικός."};
-  if(L.until&&todayISO()>L.until) return {ok:false,msg:`Ο προσωρινός κωδικός έληξε στις ${grDate(L.until)}.`};
-  return {ok:true,temp:!!L.until,until:L.until};
-}
+/* Οι κωδικοί & η εγκυρότητά τους ελέγχονται μέσα από το κρυπτογραφημένο vault:
+   δοκιμάζουμε αποκρυπτογράφηση, και αν πετύχει διαβάζουμε λήξη/ρόλο από το wrap. */
 function showGate(){
   $("#gate").classList.add("on");
   const inp=$("#gPw");
   inp.focus();
   const tryIn=async()=>{
     const pw=inp.value;
-    const v=pwValid(pw);
-    if(!v.ok){ $("#gErr").innerHTML=`<div class="flag bad"><span>!</span><span>${esc(v.msg)}</span></div>`; inp.value=""; inp.focus(); return; }
-    $("#gErr").innerHTML='<div class="flag match"><span>⏳</span><span>Αποκρυπτογράφηση δεδομένων…</span></div>';
+    if(!pw){ return; }
+    $("#gErr").innerHTML='<div class="flag match"><span>⏳</span><span>Έλεγχος & αποκρυπτογράφηση…</span></div>';
     $("#gGo").disabled=true;
-    const ok=await unlockApp(pw);
-    if(!ok){ $("#gErr").innerHTML='<div class="flag bad"><span>!</span><span>Αδυναμία αποκρυπτογράφησης της βάσης.</span></div>'; $("#gGo").disabled=false; return; }
-    if(v.temp) toast(`Προσωρινός κωδικός — ισχύει έως ${grDate(v.until)}.`);
+    const res=await unlockApp(pw);
+    $("#gGo").disabled=false;
+    if(res.err){ $("#gErr").innerHTML=`<div class="flag bad"><span>!</span><span>${esc(res.err)}</span></div>`; inp.value=""; inp.focus(); return; }
+    if(currentUser&&currentUser.until) toast(`Προσωρινός κωδικός — ισχύει έως ${grDate(currentUser.until)}.`);
     $("#gate").classList.remove("on");
     document.body.classList.add("in");
     await startApp();
   };
   $("#gGo").onclick=tryIn;
   inp.onkeydown=e=>{ if(e.key==="Enter") tryIn(); };
+  const info=$("#gInfo"); if(info) info.onclick=openTerms;
 }
+
+/* Όροι χρήσης & πρόσβασης — σε νέα καρτέλα (μόνο κατ' απαίτηση) */
+function openTerms(){
+  const html=`<!DOCTYPE html><html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Όροι Χρήσης &amp; Πρόσβασης — BCSA CRM</title>
+  <style>body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:0 auto;padding:40px 24px;color:#10242B;line-height:1.7;background:#EFF1EF}
+  h1{font-size:22px;border-bottom:3px solid #B0842F;padding-bottom:12px}h2{font-size:16px;margin-top:26px;color:#3A5560}
+  .box{background:#fff;padding:28px 30px;border-radius:6px;box-shadow:0 2px 20px -8px rgba(0,0,0,.2)}
+  .muted{color:#7C929B;font-size:13px}strong{color:#10242B}</style></head>
+  <body><div class="box">
+  <h1>Όροι Χρήσης &amp; Πρόσβασης στα Δεδομένα</h1>
+  <p class="muted">Λογισμικό διαχείρισης πελατών &amp; ραντεβού (CRM)</p>
+
+  <h2>1. Κατασκευαστής &amp; Δικαιώματα</h2>
+  <p>Το παρόν λογισμικό σχεδιάστηκε και κατασκευάστηκε από τον <strong>Ευάγγελο Γκούλιο του Αθανασίου</strong>, ιδιοκτήτη της <strong>Business Consultancy Academy</strong>. Ο κατασκευαστής διατηρεί όλα τα πνευματικά και περιουσιακά δικαιώματα επί του λογισμικού.</p>
+
+  <h2>2. Πρόσβαση στα Δεδομένα</h2>
+  <p>Με τη χρήση του προγράμματος, ο δικαιούχος/χρήστης <strong>αποδέχεται ρητά ότι ο κατασκευαστής διατηρεί πλήρη πρόσβαση στα απαραίτητα στοιχεία</strong> που καταχωρούνται στο σύστημα, στον βαθμό που αυτό απαιτείται για την επαρκή λειτουργία, υποστήριξη, συντήρηση και ορθή χρήση του λογισμικού, εφόσον παραστεί ανάγκη.</p>
+
+  <h2>3. Υποχρέωση Ενημέρωσης Πελατών</h2>
+  <p>Αποτελεί <strong>αποκλειστική υποχρέωση του δικαιούχου του προγράμματος</strong> να έχει ενημερώσει τους πελάτες του για την καταχώριση και επεξεργασία των προσωπικών τους δεδομένων στο σύστημα, σύμφωνα με την ισχύουσα νομοθεσία περί προστασίας προσωπικών δεδομένων (GDPR / Ν. 4624/2019). Ο δικαιούχος φέρει την ευθύνη εξασφάλισης της απαιτούμενης νόμιμης βάσης επεξεργασίας και της ενημέρωσης των υποκειμένων των δεδομένων.</p>
+
+  <h2>4. Ασφάλεια</h2>
+  <p>Τα δεδομένα αποθηκεύονται τοπικά σε κρυπτογραφημένη μορφή (AES-GCM 256-bit). Ο δικαιούχος οφείλει να διαφυλάσσει τους κωδικούς πρόσβασης και να τηρεί αντίγραφα ασφαλείας.</p>
+
+  <h2>5. Αποδοχή</h2>
+  <p>Η είσοδος και χρήση του λογισμικού συνιστά <strong>ανεπιφύλακτη αποδοχή</strong> των παρόντων όρων στο σύνολό τους.</p>
+
+  <p class="muted" style="margin-top:30px;border-top:1px solid #EAEEEB;padding-top:14px">© ${new Date().getFullYear()} Ευάγγελος Γκούλιος — Business Consultancy Academy. Με επιφύλαξη παντός δικαιώματος.</p>
+  </div></body></html>`;
+  const w=window.open("","_blank");
+  if(w){ w.document.write(html); w.document.close(); }
+  else{ const b=new Blob([html],{type:"text/html"}); window.open(URL.createObjectURL(b),"_blank"); }
+}
+/* Επιστρέφει {ok:true} ή {err:"..."} */
 async function unlockApp(pw){
   try{
     sessionPw=pw;
     Store.init();
     const raw=await Store.loadRaw();
-    if(raw&&raw.v===2){
+
+    // Υπάρχον κρυπτογραφημένο vault (v2 ή v3)
+    if(raw&&(raw.v===2||raw.v===3)){
       const r=await openEnvelope(raw,pw);
-      if(!r) return false;
-      DB=norm(r.db); dekKey=r.key; vaultSalt=r.salt; vaultWraps=r.wraps;
-      return true;
+      if(!r) return {err:"Λανθασμένος κωδικός ή αδυναμία αποκρυπτογράφησης."};
+      dekKey=r.key; dekRaw=r.dekRaw; vaultSalt=r.salt; vaultWraps=r.wraps;
+
+      // Migration v2 → v3: προσθήκη metadata κωδικών + owners
+      if(r.version===2){
+        vaultWraps=[]; for(const L of BOOTSTRAP_PW) vaultWraps.push(await wrapFor(L,vaultSalt,dekRaw));
+        DB=norm(r.db);
+        DB.clients.forEach(c=>{ if(!c.owner) c.owner="u_admin"; });
+        DB.appointments.forEach(a=>{ if(!a.owner) a.owner="u_admin"; });
+        currentUser={id:"u_admin",label:"Διαχειριστής (Ε. Γκούλιος)",admin:true,until:null};
+        await Store.saveRaw(await envelope());
+        return {ok:true};
+      }
+
+      // v3: εύρεση του wrap που άνοιξε → ρόλος & λήξη
+      const w=r.matched;
+      if(w.until && todayISO()>w.until) return {err:`Ο κωδικός «${w.label||""}» έληξε στις ${grDate(w.until)}.`};
+      currentUser={id:w.id,label:w.label,admin:!!w.admin,until:w.until||null};
+      DB=norm(r.db);
+      return {ok:true};
     }
-    // πρώτη εκκίνηση ή παλαιά μη κρυπτογραφημένη βάση → μετάβαση σε κρυπτογράφηση
-    await createVault();
+
+    // Πρώτη εκκίνηση (ή παλαιά μη κρυπτογραφημένη βάση): δημιουργία vault με bootstrap κωδικούς
+    const boot=BOOTSTRAP_PW.find(x=>x.p===pw);
+    if(!boot) return {err:"Λανθασμένος κωδικός."};
+    if(boot.until && todayISO()>boot.until) return {err:`Ο κωδικός «${boot.label}» έχει λήξει.`};
+    await createVault(BOOTSTRAP_PW);
     DB=norm(raw&&Array.isArray(raw.clients)?raw:{});
+    DB.clients.forEach(c=>{ if(!c.owner) c.owner=boot.id; });
+    DB.appointments.forEach(a=>{ if(!a.owner) a.owner=boot.id; });
+    currentUser={id:boot.id,label:boot.label,admin:!!boot.admin,until:boot.until||null};
     await Store.saveRaw(await envelope());
-    return true;
-  }catch(e){ return false; }
+    return {ok:true};
+  }catch(e){ return {err:"Σφάλμα: "+(e&&e.message?e.message:e)}; }
 }
 
 /* ---------- 7f. ONBOARDING (πρώτη φορά) ---------- */
@@ -2145,9 +2347,22 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp]");
     if(!b) return;
     const d=b.dataset;
+
+    if(d.pwedit){ if(isAdmin()) pwEditDialog(d.pwedit); return; }
+    if(d.pwdel){
+      if(!isAdmin()) return;
+      const w=vaultWraps.find(x=>x.id===d.pwdel);
+      if(w&&confirm(`Διαγραφή κωδικού «${w.label||w.id}»; Τα δεδομένα του χρήστη ΠΑΡΑΜΕΝΟΥΝ και είναι προσβάσιμα από τον διαχειριστή.`)){
+        vaultWraps=vaultWraps.filter(x=>x.id!==d.pwdel);
+        logIt(`Διαγραφή κωδικού χρήστη: ${w.label||w.id}`,"sys","");
+        await persist(); toast("Ο κωδικός διαγράφηκε.");
+      }
+      return;
+    }
+    if(d.uexp){ if(isAdmin()) exportUsers(d.uexp); return; }
 
     if(d.paid){
       const a=DB.appointments.find(x=>x.id===d.paid);
