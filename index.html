@@ -30,6 +30,9 @@
   .brand h1{font-family:"Noto Serif",Georgia,serif;font-size:18px;font-weight:700;line-height:1.25}
   .brand p{color:#9DB3BB;font-size:11px;letter-spacing:.9px;text-transform:uppercase;margin-top:3px}
   .head-meta{text-align:right;font-size:11.5px;color:#9DB3BB}
+  #bellChip{position:relative;font-size:15px;padding:6px 9px}
+  .bellbadge{display:none;position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:9px;background:#D64533;color:#fff;font-size:10px;font-weight:700;line-height:17px;text-align:center;padding:0 4px}
+  .bellbadge.on{display:block}
   .head-meta strong{display:block;color:#EFF1EF;font-size:13px;font-weight:600}
   .chip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;padding:3px 9px;border:1px solid #2E4A54;border-radius:20px;font-size:11px;cursor:pointer;background:none;color:#9DB3BB;font-family:inherit}
   .chip:hover{border-color:var(--brass);color:#EFF1EF}
@@ -244,6 +247,7 @@
     </div>
     <div class="head-meta">
       <strong id="todayLabel">—</strong>
+      <button class="chip" id="bellChip" title="Ειδοποιήσεις"><span id="bellIco">🔔</span><span id="bellBadge" class="bellbadge"></span></button>
       <button class="chip" id="syncChip"><i></i><span id="syncTxt">Φόρτωση…</span></button>
       <button class="chip" id="notifChip"><i></i><span id="notifTxt">Ειδοποιήσεις</span></button>
     </div>
@@ -455,11 +459,6 @@
 
   <!-- ΔΕΔΟΜΕΝΑ -->
   <section class="view" id="v-staff">
-    <div class="panel" style="margin-bottom:22px" id="admReqPanel">
-      <div class="panel-h"><h2>Αιτήματα εύρεσης προσωπικού</h2><span class="sub">Ειδοποιήσεις προς διαχειριστή</span></div>
-      <div class="panel-b"><div id="reqAdmin"></div></div>
-    </div>
-
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Ζήτηση προσωπικού</h2><span class="sub">Δήλωση ανάγκης για άτομο</span></div>
       <div class="panel-b">
@@ -502,6 +501,10 @@
   </section>
 
   <section class="view" id="v-data">
+    <div class="panel" style="margin-bottom:22px" id="admReqPanel">
+      <div class="panel-h"><h2>Αιτήματα εύρεσης προσωπικού</h2><span class="sub">Αναφορές προς διαχειριστή</span></div>
+      <div class="panel-b"><div id="reqAdmin"></div></div>
+    </div>
     <div class="panel" style="margin-bottom:22px" id="admPwPanel">
       <div class="panel-h"><h2>Διαχείριση κωδικών εισόδου</h2><span class="sub">Μόνο διαχειριστής</span></div>
       <div class="panel-b"><div id="pwAdmin"></div></div>
@@ -552,7 +555,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.2 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.3 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1030,7 +1033,7 @@ const svcForType=k=>{ const t=BIZ_TYPES.find(x=>x.k===k); return t?t.svc.slice()
 const DEF_SERVICES=svcForType("consulting");
 const DEF_PROFILE={setup:false,type:"",brand:"",tagline:"",logo:"",phone:"",email:"",address:"",afm:""};
 
-let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),staffReq:[],employees:[],shophours:{},updated:null};
+let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),staffReq:[],employees:[],shophours:{},notif:[],updated:null};
 const norm=d=>{
   const o=Object.assign({clients:[],appointments:[],history:[],services:null,profile:null,updated:null},d||{});
   if(!Array.isArray(o.services)||!o.services.length) o.services=DEF_SERVICES.slice();
@@ -1039,6 +1042,7 @@ const norm=d=>{
   if(!Array.isArray(o.staffReq)) o.staffReq=[];
   if(!Array.isArray(o.employees)) o.employees=[];
   if(!o.shophours||typeof o.shophours!=="object") o.shophours={};
+  if(!Array.isArray(o.notif)) o.notif=[];
   return o;
 };
 const prof=()=>DB.profile||DEF_PROFILE;
@@ -1817,45 +1821,76 @@ function pwEditDialog(id){
     closeModal(); await persist(); toast("Ο κωδικός ενημερώθηκε.");
   };
 }
+function allOwners(){
+  const set=new Set();
+  DB.clients.forEach(c=>set.add(c.owner||"u_admin"));
+  DB.appointments.forEach(a=>set.add(a.owner||"u_admin"));
+  (vaultWraps||[]).forEach(w=>set.add(w.id));
+  return Array.from(set);
+}
+const ownerName=id=>{ const w=(vaultWraps||[]).find(x=>x.id===id); if(w) return w.label||w.id; return id==="u_admin"?"Διαχειριστής":"Άγνωστος χρήστης"; };
+function clientsRowsFor(uid){
+  return DB.clients.filter(c=>(c.owner||"u_admin")===uid).map(c=>{
+    const as=DB.appointments.filter(a=>a.clientId===c.id&&a.status!=="cancelled");
+    const total=as.reduce((s,a)=>s+num(a.cost),0), paid=as.filter(a=>a.paid).reduce((s,a)=>s+num(a.cost),0);
+    return {c,appts:DB.appointments.filter(a=>a.clientId===c.id).length,total,paid,due:Math.round((total-paid)*100)/100};
+  });
+}
 function renderUsers(){
   const wrap=$("#admUsersPanel"), box=$("#usersAdmin"); if(!box) return;
   if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
-  const rows=vaultWraps.map(w=>({w,s:userStats(w.id)}));
-  box.innerHTML=`
-    <table><thead><tr><th>Χρήστης</th><th style="text-align:center">Πελάτες</th><th style="text-align:center">Ραντεβού</th><th style="text-align:right">Εισπράξεις</th><th style="text-align:right">Υπόλοιπα</th><th></th></tr></thead><tbody>${
-      rows.map(r=>`<tr>
-        <td class="name">${esc(r.w.label||r.w.id)}${r.w.admin?' <span class="pill p-sched">admin</span>':''}</td>
-        <td class="mono" style="text-align:center">${r.s.clients}</td>
-        <td class="mono" style="text-align:center">${r.s.appts}</td>
-        <td class="mono money" style="text-align:right">${eur(r.s.paid)}</td>
-        <td class="mono money" style="text-align:right">${r.s.due?eur(r.s.due):"—"}</td>
-        <td style="text-align:right"><button class="btn ghost sm" data-uexp="${r.w.id}">Export</button></td>
-      </tr>`).join("")
-    }</tbody></table>
-    <div class="row-end" style="justify-content:flex-start;margin-top:14px">
+  const owners=allOwners().map(id=>({id,rows:clientsRowsFor(id)}))
+    .sort((a,b)=>b.rows.length-a.rows.length);
+  box.innerHTML=owners.map(o=>{
+    const nC=o.rows.length;
+    const nA=DB.appointments.filter(a=>(a.owner||"u_admin")===o.id).length;
+    const paid=o.rows.reduce((s,r)=>s+r.paid,0), due=o.rows.reduce((s,r)=>s+r.due,0);
+    const known=(vaultWraps||[]).some(w=>w.id===o.id);
+    const inner = nC ? `<table><thead><tr><th>Ονοματεπώνυμο</th><th>Τηλέφωνο</th><th>Email</th><th style="text-align:center">Ραντεβού</th><th style="text-align:right">Πληρωμένα</th><th style="text-align:right">Υπόλοιπο</th></tr></thead><tbody>${
+        o.rows.map(r=>`<tr>
+          <td class="name">${esc(r.c.name)}</td>
+          <td class="mono muted">${esc(r.c.phone||"—")}</td>
+          <td class="muted">${esc(r.c.email||"—")}</td>
+          <td class="mono" style="text-align:center">${r.appts}</td>
+          <td class="mono money" style="text-align:right">${eur(r.paid)}</td>
+          <td class="mono money" style="text-align:right">${r.due?eur(r.due):"—"}</td>
+        </tr>`).join("")
+      }</tbody></table>` : '<div class="muted" style="padding:6px 2px">Χωρίς πελάτες.</div>';
+    return `<div class="panel" style="margin-bottom:14px;box-shadow:none;border:1px solid var(--line)">
+      <div class="panel-h" style="padding:11px 14px">
+        <h2 style="font-size:14px">${esc(ownerName(o.id))} ${known?"":'<span class="pill p-canc">κωδικός διαγράφηκε</span>'}</h2>
+        <div class="toolbar" style="align-items:center">
+          <span class="muted" style="font-size:12px">${nC} πελάτες · ${nA} ραντεβού · Πληρωμές ${eur(paid)}${due?` · Υπόλοιπο ${eur(due)}`:""}</span>
+          <button class="btn ghost sm" data-uexp="${o.id}">Export</button>
+        </div>
+      </div>
+      <div class="panel-b" style="padding:10px 14px">${inner}</div>
+    </div>`;
+  }).join("")+`
+    <div class="row-end" style="justify-content:flex-start;margin-top:6px">
       <button class="btn brass" id="expAllUsers">Εξαγωγή ΟΛΩΝ των χρηστών (Excel)</button>
     </div>
-    <p class="muted" style="margin-top:10px">Η εξαγωγή περιλαμβάνει: ονοματεπώνυμο, τηλέφωνο, email, συνολικά ποσά, υπηρεσίες/περιγραφή και ημερομηνία καταχώρισης — ανά χρήστη.</p>`;
+    <p class="muted" style="margin-top:10px">Περιλαμβάνει ονοματεπώνυμο, τηλέφωνο, email, συνολικά ποσά, υπηρεσίες/περιγραφή και ημερομηνία καταχώρισης — ανά χρήστη.</p>`;
   $("#expAllUsers").onclick=()=>exportUsers(null);
 }
-/* Φύλλο εποπτείας: μία γραμμή ανά πελάτη με τα ζητούμενα πεδία */
-function sheetOverview(uid,label){
+/* Φύλλο εποπτείας ανά owner */
+function sheetOverview(uid){
+  const label=ownerName(uid);
   const cs=DB.clients.filter(c=>(c.owner||"u_admin")===uid);
   const rows=[["Χρήστης","Ονοματεπώνυμο","Τηλέφωνο","Email","Σύνολο χρεώσεων","Πληρωμένα","Υπόλοιπο","Υπηρεσίες / Περιγραφή","Ημ. καταχώρισης"]];
   cs.forEach(c=>{
     const as=DB.appointments.filter(a=>a.clientId===c.id);
     const svc=Array.from(new Set([].concat(...as.map(a=>a.services||[])))).join(", ");
     const desc=as.map(a=>a.description).filter(Boolean).join(" | ");
-    const m=(()=>{ const d=as.filter(a=>a.status!=="cancelled"); const t=d.reduce((s,a)=>s+num(a.cost),0); const p=d.filter(a=>a.paid).reduce((s,a)=>s+num(a.cost),0); return {t,p,due:Math.round((t-p)*100)/100}; })();
-    rows.push([label,c.name,c.phone||"",c.email||"",m.t,m.p,m.due,[svc,desc].filter(Boolean).join(" · "),stamp(c.createdAt)]);
+    const d=as.filter(a=>a.status!=="cancelled"); const t=d.reduce((s,a)=>s+num(a.cost),0); const p=d.filter(a=>a.paid).reduce((s,a)=>s+num(a.cost),0);
+    rows.push([label,c.name,c.phone||"",c.email||"",t,p,Math.round((t-p)*100)/100,[svc,desc].filter(Boolean).join(" · "),stamp(c.createdAt)]);
   });
-  return {name:(label||"Χρήστης").slice(0,28),widths:[18,26,15,26,15,13,13,50,18],rows};
+  if(cs.length===0) rows.push([label,"(χωρίς πελάτες)","","","","","","",""]);
+  return {name:label.slice(0,28)||"Χρήστης",widths:[18,26,15,26,15,13,13,50,18],rows};
 }
 function exportUsers(onlyId){
-  const list = onlyId ? vaultWraps.filter(w=>w.id===onlyId) : vaultWraps;
-  const sheets=list.map(w=>sheetOverview(w.id,w.label||w.id));
-  const who = onlyId ? safeName(list[0].label||"user") : "OLOI";
-  download(`BCSA_Epopteia_${who}_${todayISO()}.xlsx`, xlsx(sheets));
+  const ids = onlyId ? [onlyId] : allOwners();
+  download(`BCSA_Epopteia_${onlyId?safeName(ownerName(onlyId)):"OLOI"}_${todayISO()}.xlsx`, xlsx(ids.map(sheetOverview)));
 }
 function renderScopeBar(){
   const bar=$("#scopeBar"); if(!bar) return;
@@ -1874,20 +1909,59 @@ function renderScopeBar(){
       : `Νέες καταχωρίσεις αποδίδονται στον χρήστη «${ownerLabel(viewScope)}».`;
   sel.onchange=()=>{ viewScope=sel.value; renderAll(); };
 }
+/* ---------- ΕΙΔΟΠΟΙΗΣΕΙΣ (καμπανάκι) ---------- */
+const ADMIN_BOX="ADMIN";
+function notify(to,text){ DB.notif.unshift({id:uid(),to,text,ts:Date.now(),read:false}); }
+function myNotifs(){
+  if(!currentUser) return [];
+  return DB.notif.filter(n=> n.to===currentUser.id || (isAdmin()&&n.to===ADMIN_BOX));
+}
+function renderBell(){
+  const badge=$("#bellBadge"); if(!badge) return;
+  const un=myNotifs().filter(n=>!n.read).length;
+  badge.textContent=un>9?"9+":String(un);
+  badge.className="bellbadge"+(un?" on":"");
+}
+function openBell(){
+  const list=myNotifs();
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Ειδοποιήσεις</h3><div class="muted">${list.length?`${list.length} συνολικά`:"Καμία ειδοποίηση"}</div></div>
+      <button class="btn ghost sm" id="nX">✕</button></div>
+    <div class="modal-b">
+      ${list.length?list.map(n=>`<div class="appt" style="margin-bottom:6px;border-left-color:${n.read?"var(--line)":"var(--brass)"}">
+          <div><div>${esc(n.text)}</div><div class="muted">${stamp(n.ts)}</div></div>
+        </div>`).join(""):'<div class="empty"><strong>Κανένα μήνυμα</strong>Εδώ θα εμφανίζονται οι ενημερώσεις σας.</div>'}
+      ${list.length?'<div class="row-end"><button class="btn ghost" id="nClear">Καθαρισμός ιστορικού</button></div>':""}
+    </div>`;
+  $("#back").classList.add("on");
+  $("#nX").onclick=closeModal;
+  const clr=$("#nClear"); if(clr) clr.onclick=async()=>{ DB.notif=DB.notif.filter(n=>!(n.to===currentUser.id||(isAdmin()&&n.to===ADMIN_BOX))); closeModal(); await persist(); toast("Το ιστορικό καθαρίστηκε."); };
+  // μαρκάρισμα ως αναγνωσμένα
+  myNotifs().forEach(n=>n.read=true);
+  renderBell(); persist();
+}
+
 /* ---------- ΠΡΟΣΩΠΙΚΟ ---------- */
 const EMP_TYPE={fulltime:"Πλήρης",parttime:"Μερική",internship:"Πρακτική"};
-const REQ_ST={open:"Ανοιχτό",working:"Σε εξέλιξη",done:"Ολοκληρώθηκε"};
+const REQ_ST={pending:"Σε αναμονή",accepted:"Σε επεξεργασία",rejected:"Απορρίφθηκε",done:"Ολοκληρώθηκε"};
+const REQ_PILL={pending:"p-past",accepted:"p-sched",rejected:"p-canc",done:"p-done"};
+const REJECT_REASON={incomplete:"Ελλιπείς πληροφορίες — προσθέστε περισσότερες λεπτομέρειες.",unavailable:"Δεν υπάρχει διαθέσιμο προσωπικό αυτή τη στιγμή."};
 const DAYS=["mon","tue","wed","thu","fri","sat","sun"];
 const mineReq=()=>DB.staffReq.filter(r=>inScope(r.owner));
 const mineEmp=()=>DB.employees.filter(e=>inScope(e.owner));
 const myHours=()=>{ const id=writeOwner(); if(!DB.shophours[id]) DB.shophours[id]=defHours(); return DB.shophours[id]; };
 function defHours(){ const h={}; DAYS.forEach((d,i)=>h[d]={closed:i>=5,open:"09:00",close:"21:00"}); return h; }
 
-/* --- Ζήτηση προσωπικού --- */
+/* --- Ζήτηση προσωπικού (χρήστης) --- */
 async function addStaffReq(){
   const position=$("#rqPos").value.trim();
   if(!position){ toast("Συμπληρώστε τη θέση.",true); return; }
-  DB.staffReq.unshift({id:uid(),owner:writeOwner(),ownerLabel:ownerLabel(writeOwner()),position,type:$("#rqType").value,note:$("#rqNote").value.trim(),status:"open",ts:Date.now()});
+  const owner=writeOwner(), label=ownerName(owner);
+  const biz=prof().brand||"";
+  DB.staffReq.unshift({id:uid(),owner,ownerLabel:label,biz,position,type:$("#rqType").value,note:$("#rqNote").value.trim(),status:"pending",ts:Date.now()});
+  notify(owner,`Στάλθηκε αίτηση για προσωπικό: «${position}» (${EMP_TYPE[$("#rqType").value]}). Σε αναμονή έγκρισης.`);
+  notify(ADMIN_BOX,`Νέα αίτηση για προσωπικό από ${biz?biz+" · ":""}${label}: «${position}» (${EMP_TYPE[$("#rqType").value]}).`);
   logIt(`Αίτημα προσωπικού: ${position} (${EMP_TYPE[$("#rqType").value]})`,"sys","");
   $("#rqPos").value=""; $("#rqNote").value="";
   await persist(); toast("Το αίτημα στάλθηκε στον διαχειριστή.");
@@ -1896,30 +1970,67 @@ function renderMyReq(){
   const box=$("#myReqList"); if(!box) return;
   const rows=mineReq();
   box.innerHTML = rows.length ? `<div class="sec-t">Τα αιτήματά μου</div>`+rows.map(r=>`
-    <div class="appt" style="margin-bottom:6px;border-left-color:${r.status==="done"?"var(--sea)":"var(--brass)"}">
-      <div><b>${esc(r.position)}</b> <span class="pill p-sched">${EMP_TYPE[r.type]||r.type}</span> <span class="pill ${r.status==="done"?"p-done":r.status==="working"?"p-sched":"p-past"}">${REQ_ST[r.status]||r.status}</span>
-        ${r.note?`<div class="t">${esc(r.note)}</div>`:""}<div class="muted">${stamp(r.ts)}</div></div>
-      <div class="appt-actions">${r.status!=="done"?`<button class="btn danger sm" data-reqdel="${r.id}">✕</button>`:""}</div>
+    <div class="appt" style="margin-bottom:6px;border-left-color:var(--brass)">
+      <div><b>${esc(r.position)}</b> <span class="pill p-sched">${EMP_TYPE[r.type]||r.type}</span> <span class="pill ${REQ_PILL[r.status]||"p-past"}">${REQ_ST[r.status]||r.status}</span>
+        ${r.note?`<div class="t">${esc(r.note)}</div>`:""}
+        ${r.status==="rejected"&&r.reason?`<div class="t" style="color:#A83A2C">Αιτιολογία: ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}
+        <div class="muted">${stamp(r.ts)}</div></div>
+      <div class="appt-actions">${r.status==="pending"||r.status==="rejected"?`<button class="btn danger sm" data-reqdel="${r.id}">✕</button>`:""}</div>
     </div>`).join("") : "";
 }
-/* Admin: όλα τα αιτήματα */
+
+/* --- Admin: αιτήματα (στα Δεδομένα & Excel) --- */
 function renderReqAdmin(){
   const wrap=$("#admReqPanel"), box=$("#reqAdmin"); if(!box) return;
   if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
-  const open=DB.staffReq.filter(r=>r.status!=="done");
   if(!DB.staffReq.length){ box.innerHTML='<div class="empty"><strong>Κανένα αίτημα</strong>Όταν ένας χρήστης ζητήσει προσωπικό, θα εμφανιστεί εδώ.</div>'; return; }
-  box.innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Χρήστης</th><th>Θέση</th><th>Τύπος</th><th>Σημειώσεις</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
+  box.innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Επιχείρηση / Χρήστης</th><th>Θέση</th><th>Τύπος</th><th>Σημειώσεις</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
     DB.staffReq.slice().sort((a,b)=>b.ts-a.ts).map(r=>`<tr>
       <td class="mono" style="white-space:nowrap">${grDate(iso(new Date(r.ts)))}<br><span class="muted">${hhmm(r.ts)}</span></td>
-      <td><span class="pill p-sched">${esc(r.ownerLabel||ownerLabel(r.owner))}</span></td>
+      <td>${r.biz?`<b>${esc(r.biz)}</b><br>`:""}<span class="pill p-sched">${esc(r.ownerLabel||ownerName(r.owner))}</span></td>
       <td class="name">${esc(r.position)}</td>
       <td>${EMP_TYPE[r.type]||r.type}</td>
-      <td class="desc">${r.note?esc(r.note):'<span class="muted">—</span>'}</td>
-      <td><select data-reqst="${r.id}" style="width:auto;padding:4px 6px;font-size:12px">${Object.keys(REQ_ST).map(k=>`<option value="${k}" ${r.status===k?"selected":""}>${REQ_ST[k]}</option>`).join("")}</select></td>
+      <td class="desc">${r.note?esc(r.note):'<span class="muted">—</span>'}${r.status==="rejected"&&r.reason?`<div style="color:#A83A2C;font-size:12px">✕ ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}</td>
+      <td><span class="pill ${REQ_PILL[r.status]||"p-past"}">${REQ_ST[r.status]||r.status}</span></td>
       <td style="text-align:right;white-space:nowrap">
-        <button class="btn ghost sm" data-reqcv="${r.id}">Αποστολή βιογραφικών</button>
+        ${r.status==="pending"?`<button class="btn ghost sm" data-reqok="${r.id}">✓ Αποδοχή</button><button class="btn danger sm" data-reqno="${r.id}">Απόρριψη</button>`:""}
+        ${r.status==="accepted"?`<button class="btn ghost sm" data-reqcv="${r.id}">Αποστολή βιογραφικών</button><button class="btn ghost sm" data-reqfin="${r.id}">Ολοκλήρωση</button>`:""}
         <button class="btn danger sm" data-reqdel="${r.id}">✕</button>
       </td></tr>`).join("")}</tbody></table>`;
+}
+async function acceptReq(id){
+  const r=DB.staffReq.find(x=>x.id===id); if(!r) return;
+  r.status="accepted"; r.reason=null;
+  notify(r.owner,`Το αίτημά σας για «${r.position}» έγινε αποδεκτό και βρίσκεται σε επεξεργασία από τον διαχειριστή.`);
+  logIt(`Αποδοχή αιτήματος προσωπικού: ${r.position} (${r.ownerLabel})`,"sys","");
+  await persist(); toast("Το αίτημα έγινε αποδεκτό.");
+}
+function rejectReq(id){
+  const r=DB.staffReq.find(x=>x.id===id); if(!r) return;
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Απόρριψη αιτήματος</h3><div class="muted">${esc(r.position)} · ${esc(r.ownerLabel||"")}</div></div><button class="btn ghost sm" id="rjX">✕</button></div>
+    <div class="modal-b">
+      <p class="muted" style="margin-top:0">Επιλέξτε αιτιολογία — θα σταλεί ως ειδοποίηση στον χρήστη.</p>
+      <div class="row-end" style="justify-content:flex-start">
+        <button class="btn brass" data-rj="incomplete">Ελλιπείς πληροφορίες</button>
+        <button class="btn brass" data-rj="unavailable">Δεν υπάρχει διαθέσιμο προσωπικό</button>
+      </div>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#rjX").onclick=closeModal;
+  $$('[data-rj]').forEach(b=>b.onclick=async()=>{
+    r.status="rejected"; r.reason=b.dataset.rj;
+    notify(r.owner,`Το αίτημά σας για «${r.position}» απορρίφθηκε: ${REJECT_REASON[r.reason]}`);
+    logIt(`Απόρριψη αιτήματος «${r.position}» (${r.ownerLabel}): ${REJECT_REASON[r.reason]}`,"sys","");
+    closeModal(); await persist(); toast("Στάλθηκε η απόρριψη.");
+  });
+}
+async function finishReq(id){
+  const r=DB.staffReq.find(x=>x.id===id); if(!r) return;
+  r.status="done";
+  notify(r.owner,`Το αίτημά σας για «${r.position}» ολοκληρώθηκε.`);
+  await persist(); toast("Το αίτημα ολοκληρώθηκε.");
 }
 /* Αποστολή link βιογραφικών προς τον χρήστη που ζήτησε */
 function sendCV(reqId){
@@ -1930,21 +2041,27 @@ function sendCV(reqId){
     <div class="modal-b">
       <div class="field" style="margin:0"><label>Σύνδεσμος βιογραφικού/-ών</label><input id="cvLink" placeholder="https://… (Drive, PDF, φάκελος)"></div>
       <div class="field" style="margin:0"><label>Σημείωμα</label><textarea id="cvNote" placeholder="Σχόλια για τους υποψηφίους…"></textarea></div>
-      <div class="sec-t">Άνοιγμα με</div>
+      <div class="sec-t">Αποστολή</div>
       <div class="row-end" style="justify-content:flex-start" id="cvMailers"></div>
-      <p class="muted">Στέλνεται email στον χρήστη «${esc(r.ownerLabel||"")}» με τον σύνδεσμο. (Απαιτείται email στα στοιχεία του χρήστη — αλλιώς αντιγράψτε τον σύνδεσμο χειροκίνητα.)</p>
+      <p class="muted">Στέλνεται ειδοποίηση στον χρήστη με τον σύνδεσμο· προαιρετικά ανοίγει και email (αν υπάρχει διεύθυνση στα στοιχεία της επιχείρησης).</p>
     </div>`;
   $("#back").classList.add("on");
   $("#cvX").onclick=closeModal;
-  $("#cvMailers").innerHTML=MAILERS.map(m=>`<button class="btn ghost" data-cvm="${m.k}">${m.n}</button>`).join("");
-  $$("#cvMailers button").forEach(b=>b.onclick=async()=>{
+  $("#cvMailers").innerHTML=`<button class="btn brass" id="cvSend">Καταχώριση & ειδοποίηση χρήστη</button>`+MAILERS.map(m=>`<button class="btn ghost" data-cvm="${m.k}">${m.n}</button>`).join("");
+  const doNotify=async()=>{
+    const link=$("#cvLink").value.trim();
+    if(link){ notify(r.owner,`Βιογραφικά για «${r.position}»: ${link}${$("#cvNote").value.trim()?" — "+$("#cvNote").value.trim():""}`); }
+    r.status="accepted"; logIt(`Αποστολή βιογραφικών για «${r.position}» → ${r.ownerLabel}`,"sys","");
+    await persist();
+  };
+  $("#cvSend").onclick=async()=>{ await doNotify(); closeModal(); toast("Ο χρήστης ειδοποιήθηκε."); };
+  $$("#cvMailers button[data-cvm]").forEach(b=>b.onclick=async()=>{
     const m=MAILERS.find(x=>x.k===b.dataset.cvm);
     const to=encodeURIComponent(prof().email||"");
     const su=encodeURIComponent(`Βιογραφικά για θέση: ${r.position}`);
     const bo=encodeURIComponent(`Σχετικά με το αίτημά σας για «${r.position}» (${EMP_TYPE[r.type]}):\n\nΣύνδεσμος: ${$("#cvLink").value}\n\n${$("#cvNote").value}\n\nΜε εκτίμηση,\nΕυάγγελος Γκούλιος — Business Consultancy Academy`);
     window.open(m.u(to,su,bo),"_blank");
-    r.status="working"; logIt(`Αποστολή βιογραφικών για «${r.position}» → ${r.ownerLabel}`,"sys","");
-    closeModal(); await persist(); toast("Άνοιξε το μήνυμα.");
+    await doNotify(); closeModal(); toast("Άνοιξε το μήνυμα.");
   });
 }
 
@@ -2070,7 +2187,7 @@ function renderStaffCounts(){
   const n = isAdmin() ? DB.staffReq.filter(r=>r.status!=="done").length : 0;
   const el=$("#nStaff"); if(el) el.textContent=n?String(n):"";
 }
-function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShift(); renderStaffCounts(); updateChip(); updateNotifChip(); }
+function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
 function openClient(id){
@@ -2549,6 +2666,7 @@ function bind(){
   $("#fTime").addEventListener("blur",fixTime);
   $("#fTime").addEventListener("keydown",e=>{ if(e.key==="Enter"){ fixTime(); addEntry(); } });
   $("#notifChip").onclick=askNotif;
+  $("#bellChip").onclick=openBell;
   $("#fMic").onclick=toggleMic;
   $("#fMail").onclick=()=>{
     const name=$("#fName").value.trim(), email=$("#fEmail").value.trim(), phone=$("#fPhone").value.trim();
@@ -2560,11 +2678,6 @@ function bind(){
   $("#rqAdd").onclick=addStaffReq;
   $("#empAdd").onclick=addEmp;
   $("#expShift").onclick=()=>download(`Programma_Ergasias_${todayISO()}.xlsx`,xlsx([sheetShift()]));
-  document.addEventListener("change",async ev=>{
-    const s=ev.target.closest("select[data-reqst]"); if(!s) return;
-    const r=DB.staffReq.find(x=>x.id===s.dataset.reqst);
-    if(r){ r.status=s.value; logIt(`Αίτημα «${r.position}» → ${REQ_ST[s.value]}`,"sys",""); await persist(); }
-  });
   $("#svcAdd").onclick=async()=>{
     const v=$("#svcNew").value.trim();
     if(!v) return;
@@ -2637,10 +2750,13 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-reqdel],button[data-reqcv],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
+    if(d.reqok){ if(isAdmin()) await acceptReq(d.reqok); return; }
+    if(d.reqno){ if(isAdmin()) rejectReq(d.reqno); return; }
+    if(d.reqfin){ if(isAdmin()) await finishReq(d.reqfin); return; }
     if(d.reqdel){
       const r=DB.staffReq.find(x=>x.id===d.reqdel);
       if(r&&confirm(`Διαγραφή αιτήματος «${r.position}»;`)){ DB.staffReq=DB.staffReq.filter(x=>x.id!==d.reqdel); await persist(); toast("Διαγράφηκε."); }
@@ -2744,6 +2860,24 @@ function bind(){
   });
 }
 
+/* Σιωπηλή ανανέωση: φορτώνει νεότερη έκδοση της βάσης χωρίς να ενοχλεί τον χρήστη */
+async function reloadFromStore(){
+  try{
+    if(!dekKey) return;
+    if($("#back").classList.contains("on")) return;               // ανοιχτό παράθυρο → μη διακόπτεις
+    const ae=document.activeElement;
+    if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")) return; // πληκτρολογεί
+    const raw=await Store.loadRaw();
+    if(!raw||raw.v!==3) return;
+    const js=TD.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(raw.iv)},dekKey,b64d(raw.data)));
+    const fresh=JSON.parse(js);
+    if((fresh.updated||0)>(DB.updated||0)){
+      DB=norm(fresh); vaultWraps=raw.wraps||vaultWraps;
+      renderAll();
+    }
+  }catch(e){}
+}
+
 /* ---------- 10. BOOT ---------- */
 async function startApp(){
   const now=new Date();
@@ -2765,6 +2899,8 @@ async function startApp(){
   updateNotifChip();
   checkAlerts();
   setInterval(checkAlerts,20000);
+  setInterval(reloadFromStore,60000);   // σιωπηλή ανανέωση ανά 60΄΄
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) reloadFromStore(); });
 
   if(!prof().setup){
     setTimeout(showOnboarding,300);   // πρώτη φορά: ρύθμιση επιχείρησης
