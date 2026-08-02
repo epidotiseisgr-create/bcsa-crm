@@ -257,6 +257,7 @@
     <button class="tab" data-view="day">Ημερήσιο</button>
     <button class="tab" data-view="week">Εβδομαδιαίο</button>
     <button class="tab" data-view="month">Μηνιαίο</button>
+    <button class="tab" data-view="staff">Προσωπικό <span class="n" id="nStaff"></span></button>
     <button class="tab" data-view="data">Δεδομένα &amp; Excel</button>
   </div>
 </nav>
@@ -264,6 +265,7 @@
 <main>
   <!-- ΠΕΛΑΤΕΣ & ΡΑΝΤΕΒΟΥ -->
   <section class="view on" id="v-clients">
+    <div id="scopeBar" style="display:none;margin-bottom:16px"></div>
     <div class="grid">
       <div class="panel">
         <div class="panel-h"><h2 id="formTitle">Νέα καταχώριση</h2><span class="sub" id="formSub">Πελάτης + ραντεβού</span></div>
@@ -452,6 +454,53 @@
   </section>
 
   <!-- ΔΕΔΟΜΕΝΑ -->
+  <section class="view" id="v-staff">
+    <div class="panel" style="margin-bottom:22px" id="admReqPanel">
+      <div class="panel-h"><h2>Αιτήματα εύρεσης προσωπικού</h2><span class="sub">Ειδοποιήσεις προς διαχειριστή</span></div>
+      <div class="panel-b"><div id="reqAdmin"></div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-h"><h2>Ζήτηση προσωπικού</h2><span class="sub">Δήλωση ανάγκης για άτομο</span></div>
+      <div class="panel-b">
+        <p class="muted" style="margin-top:0">Δηλώστε ότι χρειάζεστε άτομο. Το αίτημα φτάνει στον διαχειριστή, ο οποίος θα αναζητήσει υποψηφίους και θα σας στείλει βιογραφικά.</p>
+        <div class="two">
+          <div class="field"><label for="rqPos">Θέση / ειδικότητα *</label><input id="rqPos" placeholder="π.χ. Βοηθός κομμωτή"></div>
+          <div class="field"><label for="rqType">Τύπος απασχόλησης</label>
+            <select id="rqType"><option value="fulltime">Πλήρης απασχόληση</option><option value="parttime">Μερική απασχόληση</option><option value="internship">Πρακτική άσκηση</option></select>
+          </div>
+        </div>
+        <div class="field"><label for="rqNote">Σημειώσεις (προαιρετικά)</label><textarea id="rqNote" placeholder="Ωράριο, προσόντα, πότε χρειάζεται…"></textarea></div>
+        <div class="row-end"><button class="btn brass" id="rqAdd">📣 Αποστολή αιτήματος</button></div>
+        <div id="myReqList" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-h"><h2>Ωράριο λειτουργίας</h2><span class="sub">Πότε είναι ανοιχτό το κατάστημα</span></div>
+      <div class="panel-b"><div id="hoursBox"></div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-h"><h2>Υπάλληλοι</h2><span class="sub">Στοιχεία &amp; διαθεσιμότητα</span></div>
+      <div class="panel-b">
+        <div class="two" style="grid-template-columns:1fr 1fr auto;align-items:end">
+          <div class="field" style="margin:0"><label for="empName">Ονοματεπώνυμο</label><input id="empName" placeholder="π.χ. Ελένη Δ."></div>
+          <div class="field" style="margin:0"><label for="empRole">Θέση</label><input id="empRole" placeholder="π.χ. Κομμώτρια"></div>
+          <button class="btn brass" id="empAdd">Προσθήκη</button>
+        </div>
+        <div id="empList" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>Πρόγραμμα εργασίας</h2>
+        <div class="toolbar"><button class="btn brass sm" id="expShift">Export Excel</button></div>
+      </div>
+      <div id="shiftBox"></div>
+    </div>
+  </section>
+
   <section class="view" id="v-data">
     <div class="panel" style="margin-bottom:22px" id="admPwPanel">
       <div class="panel-h"><h2>Διαχείριση κωδικών εισόδου</h2><span class="sub">Μόνο διαχειριστής</span></div>
@@ -503,7 +552,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.0 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.2 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -981,12 +1030,15 @@ const svcForType=k=>{ const t=BIZ_TYPES.find(x=>x.k===k); return t?t.svc.slice()
 const DEF_SERVICES=svcForType("consulting");
 const DEF_PROFILE={setup:false,type:"",brand:"",tagline:"",logo:"",phone:"",email:"",address:"",afm:""};
 
-let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),updated:null};
+let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),staffReq:[],employees:[],shophours:{},updated:null};
 const norm=d=>{
   const o=Object.assign({clients:[],appointments:[],history:[],services:null,profile:null,updated:null},d||{});
   if(!Array.isArray(o.services)||!o.services.length) o.services=DEF_SERVICES.slice();
   o.profile=Object.assign({},DEF_PROFILE,o.profile||{});
   o.appointments=o.appointments.map(a=>Object.assign({cost:0,paid:false,services:[]},a));
+  if(!Array.isArray(o.staffReq)) o.staffReq=[];
+  if(!Array.isArray(o.employees)) o.employees=[];
+  if(!o.shophours||typeof o.shophours!=="object") o.shophours={};
   return o;
 };
 const prof=()=>DB.profile||DEF_PROFILE;
@@ -1002,10 +1054,23 @@ function applyBranding(){
     document.title=(p.brand?p.brand:"BCSA")+" — CRM";
   }catch(e){}
 }
+let viewScope="self";   // για διαχειριστή: "self" | "all" | <userId>
 const scopeId=()=>currentUser?currentUser.id:"u_admin";
+function inScope(owner){
+  const o=owner||"u_admin";
+  if(!isAdmin()) return o===scopeId();
+  if(viewScope==="all") return true;
+  if(viewScope==="self") return o===scopeId();
+  return o===viewScope;
+}
+function writeOwner(){
+  if(isAdmin() && viewScope!=="all" && viewScope!=="self") return viewScope;
+  return scopeId();
+}
+const ownerLabel=id=>{ const w=(vaultWraps||[]).find(x=>x.id===id); return w?(w.label||w.id):(id==="u_admin"?"Διαχειριστής":id); };
 const myNames=()=>new Set(mineC().map(c=>nz(c.name)));
-const mineC=()=>DB.clients.filter(c=>(c.owner||"u_admin")===scopeId());
-const mineA=()=>DB.appointments.filter(a=>(a.owner||"u_admin")===scopeId());
+const mineC=()=>DB.clients.filter(c=>inScope(c.owner));
+const mineA=()=>DB.appointments.filter(a=>inScope(a.owner));
 const apptsOf=id=>DB.appointments.filter(a=>a.clientId===id).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
 const apptsSorted=()=>mineA().slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
 const clientOf=a=>DB.clients.find(c=>c.id===a.clientId)||{};
@@ -1420,7 +1485,7 @@ async function addEntry(){
     if(!date&&desc&&desc!==c.notes){ c.notes=desc; ch.push("σημειώσεις"); }
     if(ch.length) logIt(`Ενημέρωση στοιχείων πελάτη (${ch.join(", ")}): ${c.name}`,"sys",c.name);
   }else{
-    c={id:uid(),owner:scopeId(),name,email,phone,notes:date?"":desc,createdAt:Date.now()};
+    c={id:uid(),owner:writeOwner(),name,email,phone,notes:date?"":desc,createdAt:Date.now()};
     DB.clients.push(c);
     logIt(`Νέος πελάτης στη βάση: ${name}${phone?` (${phone})`:""}`,"sys",name);
   }
@@ -1437,7 +1502,7 @@ async function addEntry(){
   }else if(date){
     const clash=mineA().find(a=>a.date===date&&a.time===time&&a.status==="scheduled");
     if(clash&&!confirm(`Υπάρχει ήδη ραντεβού στις ${grDate(date)} ${time} (${clash.clientName}). Να καταχωρηθεί κι αυτό;`)) return;
-    DB.appointments.push({id:uid(),owner:scopeId(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,status:"scheduled",createdAt:Date.now()});
+    DB.appointments.push({id:uid(),owner:writeOwner(),clientId:c.id,clientName:c.name,date,time,description:desc,cost,paid,services,status:"scheduled",createdAt:Date.now()});
     logIt(`Νέο ραντεβού: ${c.name} — ${grDate(date)} στις ${time}${desc?" · "+desc:""}${extra?" · "+extra:""}`,"auto",c.name);
     toast("Το ραντεβού καταχωρήθηκε στο ιστορικό.");
   }else{
@@ -1468,9 +1533,11 @@ function filteredAppts(){
 }
 function renderAppts(){
   const rows=filteredAppts();
+  const showOwner = isAdmin() && viewScope==="all";
   if(!rows.length){ $("#apptTable").innerHTML='<div class="empty"><strong>Κανένα ραντεβού σε αυτό το φίλτρο</strong>Καταχωρίστε ημερομηνία και ώρα στη φόρμα και πατήστε Add.</div>'; return; }
-  $("#apptTable").innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Πελάτης</th><th>Περιγραφή / Υπηρεσίες</th><th>Κόστος</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr>
+  $("#apptTable").innerHTML=`<table><thead><tr><th>Ημ/νία</th>${showOwner?'<th>Χρήστης</th>':''}<th>Πελάτης</th><th>Περιγραφή / Υπηρεσίες</th><th>Κόστος</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr>
     <td class="mono" style="white-space:nowrap">${grDate(a.date)}<br><span class="muted">${esc(a.time)}</span></td>
+    ${showOwner?`<td><span class="pill p-sched">${esc(ownerLabel(a.owner||"u_admin"))}</span></td>`:""}
     <td><button class="lnk" data-open="${a.clientId}">${esc(a.clientName)}</button><div class="muted">${DOW[dowIdx(parseISO(a.date))]}</div></td>
     <td class="desc">${a.description?esc(a.description):'<span class="muted">—</span>'}${(a.services||[]).length?`<div class="tagline">${a.services.map(x=>`<span class="stag">${esc(x)}</span>`).join("")}</div>`:""}</td>
     <td style="white-space:nowrap">${num(a.cost)?`<div class="money">${eur(num(a.cost))}</div><button class="btn ${a.paid?"ghost":"danger"} sm" data-paid="${a.id}" style="margin-top:3px">${a.paid?"✓ Εξοφλήθηκε":"Εκκρεμεί"}</button>`:'<span class="muted">—</span>'}</td>
@@ -1491,10 +1558,12 @@ function filteredClients(){
 function renderClients(){
   const rows=filteredClients();
   $("#clientNames").innerHTML=mineC().map(c=>`<option value="${esc(c.name)}"></option>`).join("");
+  const showOwner = isAdmin() && viewScope==="all";
   if(!rows.length){ $("#clientTable").innerHTML='<div class="empty"><strong>Κανένας πελάτης</strong>Κάθε όνομα που καταχωρείτε αποθηκεύεται εδώ αυτόματα.</div>'; return; }
-  $("#clientTable").innerHTML=`<table><thead><tr><th>Ονοματεπώνυμο</th><th>Email</th><th>Τηλέφωνο</th><th>Επόμενο</th><th style="text-align:center">Ραντεβού</th><th>Πληρωμές</th><th></th></tr></thead><tbody>${rows.map(c=>{
+  $("#clientTable").innerHTML=`<table><thead><tr>${showOwner?'<th>Χρήστης</th>':''}<th>Ονοματεπώνυμο</th><th>Email</th><th>Τηλέφωνο</th><th>Επόμενο</th><th style="text-align:center">Ραντεβού</th><th>Πληρωμές</th><th></th></tr></thead><tbody>${rows.map(c=>{
     const all=apptsOf(c.id), next=all.find(a=>a.date>=todayISO()&&a.status==="scheduled");
     return `<tr>
+      ${showOwner?`<td><span class="pill p-sched">${esc(ownerLabel(c.owner||"u_admin"))}</span></td>`:""}
       <td><button class="lnk" data-open="${c.id}">${esc(c.name)}</button>${c.notes?`<div class="muted">${esc(c.notes)}</div>`:""}</td>
       <td>${hasEmail(c)?`<button class="lnk" data-mail="${c.id}" title="Αποστολή email">✉ ${esc(c.email)}</button>`:`<span class="muted">${esc(c.email||"—")}</span>`}</td>
       <td class="mono muted">${c.phone?esc(c.phone):"—"}</td>
@@ -1788,7 +1857,220 @@ function exportUsers(onlyId){
   const who = onlyId ? safeName(list[0].label||"user") : "OLOI";
   download(`BCSA_Epopteia_${who}_${todayISO()}.xlsx`, xlsx(sheets));
 }
-function renderAll(){ renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); updateChip(); updateNotifChip(); }
+function renderScopeBar(){
+  const bar=$("#scopeBar"); if(!bar) return;
+  if(!isAdmin()){ bar.style.display="none"; return; }
+  bar.style.display="";
+  const opts=[`<option value="self">Μόνο τα δικά μου</option>`,`<option value="all">Όλοι οι χρήστες</option>`]
+    .concat((vaultWraps||[]).map(w=>`<option value="${w.id}">${esc(w.label||w.id)}</option>`));
+  bar.innerHTML=`<div class="panel" style="border-left:3px solid var(--brass)"><div class="panel-b" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px">
+    <b style="font-family:'Noto Serif',serif">Προβολή διαχειριστή</b>
+    <select id="scopeSel" style="width:auto;min-width:200px">${opts.join("")}</select>
+    <span class="muted" id="scopeInfo"></span>
+  </div></div>`;
+  const sel=$("#scopeSel"); sel.value=viewScope;
+  $("#scopeInfo").textContent = viewScope==="all" ? "Βλέπετε πελάτες & ραντεβού όλων των χρηστών."
+      : viewScope==="self" ? "Βλέπετε μόνο τις δικές σας καταχωρίσεις."
+      : `Νέες καταχωρίσεις αποδίδονται στον χρήστη «${ownerLabel(viewScope)}».`;
+  sel.onchange=()=>{ viewScope=sel.value; renderAll(); };
+}
+/* ---------- ΠΡΟΣΩΠΙΚΟ ---------- */
+const EMP_TYPE={fulltime:"Πλήρης",parttime:"Μερική",internship:"Πρακτική"};
+const REQ_ST={open:"Ανοιχτό",working:"Σε εξέλιξη",done:"Ολοκληρώθηκε"};
+const DAYS=["mon","tue","wed","thu","fri","sat","sun"];
+const mineReq=()=>DB.staffReq.filter(r=>inScope(r.owner));
+const mineEmp=()=>DB.employees.filter(e=>inScope(e.owner));
+const myHours=()=>{ const id=writeOwner(); if(!DB.shophours[id]) DB.shophours[id]=defHours(); return DB.shophours[id]; };
+function defHours(){ const h={}; DAYS.forEach((d,i)=>h[d]={closed:i>=5,open:"09:00",close:"21:00"}); return h; }
+
+/* --- Ζήτηση προσωπικού --- */
+async function addStaffReq(){
+  const position=$("#rqPos").value.trim();
+  if(!position){ toast("Συμπληρώστε τη θέση.",true); return; }
+  DB.staffReq.unshift({id:uid(),owner:writeOwner(),ownerLabel:ownerLabel(writeOwner()),position,type:$("#rqType").value,note:$("#rqNote").value.trim(),status:"open",ts:Date.now()});
+  logIt(`Αίτημα προσωπικού: ${position} (${EMP_TYPE[$("#rqType").value]})`,"sys","");
+  $("#rqPos").value=""; $("#rqNote").value="";
+  await persist(); toast("Το αίτημα στάλθηκε στον διαχειριστή.");
+}
+function renderMyReq(){
+  const box=$("#myReqList"); if(!box) return;
+  const rows=mineReq();
+  box.innerHTML = rows.length ? `<div class="sec-t">Τα αιτήματά μου</div>`+rows.map(r=>`
+    <div class="appt" style="margin-bottom:6px;border-left-color:${r.status==="done"?"var(--sea)":"var(--brass)"}">
+      <div><b>${esc(r.position)}</b> <span class="pill p-sched">${EMP_TYPE[r.type]||r.type}</span> <span class="pill ${r.status==="done"?"p-done":r.status==="working"?"p-sched":"p-past"}">${REQ_ST[r.status]||r.status}</span>
+        ${r.note?`<div class="t">${esc(r.note)}</div>`:""}<div class="muted">${stamp(r.ts)}</div></div>
+      <div class="appt-actions">${r.status!=="done"?`<button class="btn danger sm" data-reqdel="${r.id}">✕</button>`:""}</div>
+    </div>`).join("") : "";
+}
+/* Admin: όλα τα αιτήματα */
+function renderReqAdmin(){
+  const wrap=$("#admReqPanel"), box=$("#reqAdmin"); if(!box) return;
+  if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
+  const open=DB.staffReq.filter(r=>r.status!=="done");
+  if(!DB.staffReq.length){ box.innerHTML='<div class="empty"><strong>Κανένα αίτημα</strong>Όταν ένας χρήστης ζητήσει προσωπικό, θα εμφανιστεί εδώ.</div>'; return; }
+  box.innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Χρήστης</th><th>Θέση</th><th>Τύπος</th><th>Σημειώσεις</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
+    DB.staffReq.slice().sort((a,b)=>b.ts-a.ts).map(r=>`<tr>
+      <td class="mono" style="white-space:nowrap">${grDate(iso(new Date(r.ts)))}<br><span class="muted">${hhmm(r.ts)}</span></td>
+      <td><span class="pill p-sched">${esc(r.ownerLabel||ownerLabel(r.owner))}</span></td>
+      <td class="name">${esc(r.position)}</td>
+      <td>${EMP_TYPE[r.type]||r.type}</td>
+      <td class="desc">${r.note?esc(r.note):'<span class="muted">—</span>'}</td>
+      <td><select data-reqst="${r.id}" style="width:auto;padding:4px 6px;font-size:12px">${Object.keys(REQ_ST).map(k=>`<option value="${k}" ${r.status===k?"selected":""}>${REQ_ST[k]}</option>`).join("")}</select></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn ghost sm" data-reqcv="${r.id}">Αποστολή βιογραφικών</button>
+        <button class="btn danger sm" data-reqdel="${r.id}">✕</button>
+      </td></tr>`).join("")}</tbody></table>`;
+}
+/* Αποστολή link βιογραφικών προς τον χρήστη που ζήτησε */
+function sendCV(reqId){
+  const r=DB.staffReq.find(x=>x.id===reqId); if(!r) return;
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Αποστολή βιογραφικών</h3><div class="muted">${esc(r.position)} · ${esc(r.ownerLabel||"")}</div></div><button class="btn ghost sm" id="cvX">✕</button></div>
+    <div class="modal-b">
+      <div class="field" style="margin:0"><label>Σύνδεσμος βιογραφικού/-ών</label><input id="cvLink" placeholder="https://… (Drive, PDF, φάκελος)"></div>
+      <div class="field" style="margin:0"><label>Σημείωμα</label><textarea id="cvNote" placeholder="Σχόλια για τους υποψηφίους…"></textarea></div>
+      <div class="sec-t">Άνοιγμα με</div>
+      <div class="row-end" style="justify-content:flex-start" id="cvMailers"></div>
+      <p class="muted">Στέλνεται email στον χρήστη «${esc(r.ownerLabel||"")}» με τον σύνδεσμο. (Απαιτείται email στα στοιχεία του χρήστη — αλλιώς αντιγράψτε τον σύνδεσμο χειροκίνητα.)</p>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#cvX").onclick=closeModal;
+  $("#cvMailers").innerHTML=MAILERS.map(m=>`<button class="btn ghost" data-cvm="${m.k}">${m.n}</button>`).join("");
+  $$("#cvMailers button").forEach(b=>b.onclick=async()=>{
+    const m=MAILERS.find(x=>x.k===b.dataset.cvm);
+    const to=encodeURIComponent(prof().email||"");
+    const su=encodeURIComponent(`Βιογραφικά για θέση: ${r.position}`);
+    const bo=encodeURIComponent(`Σχετικά με το αίτημά σας για «${r.position}» (${EMP_TYPE[r.type]}):\n\nΣύνδεσμος: ${$("#cvLink").value}\n\n${$("#cvNote").value}\n\nΜε εκτίμηση,\nΕυάγγελος Γκούλιος — Business Consultancy Academy`);
+    window.open(m.u(to,su,bo),"_blank");
+    r.status="working"; logIt(`Αποστολή βιογραφικών για «${r.position}» → ${r.ownerLabel}`,"sys","");
+    closeModal(); await persist(); toast("Άνοιξε το μήνυμα.");
+  });
+}
+
+/* --- Ωράριο καταστήματος --- */
+const DAY_GR={mon:"Δευτέρα",tue:"Τρίτη",wed:"Τετάρτη",thu:"Πέμπτη",fri:"Παρασκευή",sat:"Σάββατο",sun:"Κυριακή"};
+function renderHours(){
+  const box=$("#hoursBox"); if(!box) return;
+  const h=myHours();
+  box.innerHTML=`<table><thead><tr><th>Ημέρα</th><th>Κλειστά</th><th>Άνοιγμα</th><th>Κλείσιμο</th></tr></thead><tbody>${
+    DAYS.map(d=>`<tr>
+      <td class="name">${DAY_GR[d]}</td>
+      <td><input type="checkbox" data-hclosed="${d}" ${h[d].closed?"checked":""} style="width:auto"></td>
+      <td><input type="time" data-hopen="${d}" value="${h[d].open}" ${h[d].closed?"disabled":""} style="width:auto"></td>
+      <td><input type="time" data-hclose="${d}" value="${h[d].close}" ${h[d].closed?"disabled":""} style="width:auto"></td>
+    </tr>`).join("")}</tbody></table>
+    <div class="row-end" style="margin-top:12px"><button class="btn brass sm" id="hoursSave">Αποθήκευση ωραρίου</button></div>`;
+  $("#hoursSave").onclick=async()=>{
+    const id=writeOwner(); const nh={};
+    DAYS.forEach(d=>{ nh[d]={closed:$(`[data-hclosed="${d}"]`).checked,open:$(`[data-hopen="${d}"]`).value||"09:00",close:$(`[data-hclose="${d}"]`).value||"21:00"}; });
+    DB.shophours[id]=nh; await persist(); toast("Το ωράριο αποθηκεύτηκε.");
+  };
+  $$('[data-hclosed]').forEach(cb=>cb.onchange=()=>{ const d=cb.dataset.hclosed; $(`[data-hopen="${d}"]`).disabled=cb.checked; $(`[data-hclose="${d}"]`).disabled=cb.checked; });
+}
+
+/* --- Υπάλληλοι & διαθεσιμότητα --- */
+async function addEmp(){
+  const name=$("#empName").value.trim();
+  if(!name){ toast("Συμπληρώστε όνομα υπαλλήλου.",true); return; }
+  const avail={}; DAYS.forEach(d=>avail[d]={mode:"yes",from:"",to:""});
+  DB.employees.push({id:uid(),owner:writeOwner(),name,role:$("#empRole").value.trim(),avail});
+  $("#empName").value=""; $("#empRole").value="";
+  await persist(); toast("Ο υπάλληλος προστέθηκε.");
+}
+function renderEmp(){
+  const box=$("#empList"); if(!box) return;
+  const list=mineEmp();
+  if(!list.length){ box.innerHTML='<div class="empty"><strong>Κανένας υπάλληλος</strong>Προσθέστε υπαλλήλους για να παραχθεί πρόγραμμα εργασίας.</div>'; return; }
+  box.innerHTML=list.map(e=>`
+    <div class="panel" style="margin-bottom:12px;box-shadow:none">
+      <div class="panel-h" style="padding:10px 14px">
+        <h2 style="font-size:14px">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}</h2>
+        <button class="btn danger sm" data-empdel="${e.id}">✕ Διαγραφή</button>
+      </div>
+      <div class="panel-b" style="padding:12px 14px">
+        <div class="sec-t">Διαθεσιμότητα ανά ημέρα</div>
+        <table><tbody>${DAYS.map(d=>{
+          const a=e.avail[d]||{mode:"yes"};
+          return `<tr>
+            <td class="name" style="width:90px">${DAY_GR[d]}</td>
+            <td style="width:150px"><select data-empmode="${e.id}:${d}" style="width:100%;padding:5px 6px;font-size:12.5px">
+              <option value="yes" ${a.mode==="yes"?"selected":""}>Διαθέσιμος</option>
+              <option value="no" ${a.mode==="no"?"selected":""}>Μη διαθέσιμος</option>
+              <option value="partial" ${a.mode==="partial"?"selected":""}>Μόνο ώρες…</option>
+            </select></td>
+            <td>${a.mode==="partial"?`<span class="muted">από</span> <input type="time" data-empfrom="${e.id}:${d}" value="${a.from||""}" style="width:auto"> <span class="muted">έως</span> <input type="time" data-empto="${e.id}:${d}" value="${a.to||""}" style="width:auto">`:""}</td>
+          </tr>`;
+        }).join("")}</tbody></table>
+      </div>
+    </div>`).join("");
+  // handlers
+  $$('[data-empmode]').forEach(sel=>sel.onchange=async()=>{
+    const [id,d]=sel.dataset.empmode.split(":"); const e=DB.employees.find(x=>x.id===id); if(!e) return;
+    e.avail[d].mode=sel.value; await persist();
+  });
+  $$('[data-empfrom]').forEach(inp=>inp.onchange=async()=>{ const [id,d]=inp.dataset.empfrom.split(":"); const e=DB.employees.find(x=>x.id===id); if(e){ e.avail[d].from=inp.value; await persist(); } });
+  $$('[data-empto]').forEach(inp=>inp.onchange=async()=>{ const [id,d]=inp.dataset.empto.split(":"); const e=DB.employees.find(x=>x.id===id); if(e){ e.avail[d].to=inp.value; await persist(); } });
+}
+
+/* --- Υπολογισμός προγράμματος: τομή ωραρίου καταστήματος × διαθεσιμότητας --- */
+const toMin=t=>{ const [h,m]=String(t||"").split(":").map(Number); return (h||0)*60+(m||0); };
+const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+function empShift(e,d,hrs){
+  const day=hrs[d]; if(day.closed) return null;
+  const a=e.avail[d]||{mode:"yes"};
+  if(a.mode==="no") return null;
+  let from=toMin(day.open), to=toMin(day.close);
+  if(a.mode==="partial"){
+    if(a.from) from=Math.max(from,toMin(a.from));
+    if(a.to) to=Math.min(to,toMin(a.to));
+  }
+  if(to<=from) return null;
+  return {from,to,hours:Math.round((to-from)/6)/10};
+}
+function shiftData(){
+  const hrs = isAdmin()&&viewScope!=="all"&&viewScope!=="self" ? (DB.shophours[viewScope]||defHours())
+            : (DB.shophours[writeOwner()]||myHours());
+  const emps=mineEmp();
+  return {hrs,emps};
+}
+function renderShift(){
+  const box=$("#shiftBox"); if(!box) return;
+  const {hrs,emps}=shiftData();
+  if(!emps.length){ box.innerHTML='<div class="empty"><strong>Χωρίς πρόγραμμα</strong>Προσθέστε υπαλλήλους και ορίστε ωράριο λειτουργίας.</div>'; return; }
+  let totalH={}; emps.forEach(e=>totalH[e.id]=0);
+  const body=DAYS.map(d=>{
+    if(hrs[d].closed) return `<tr><td class="name">${DAY_GR[d]}</td><td colspan="${emps.length}" class="muted" style="text-align:center">Κλειστά</td></tr>`;
+    const cells=emps.map(e=>{
+      const s=empShift(e,d,hrs);
+      if(!s) return `<td class="muted" style="text-align:center">—</td>`;
+      totalH[e.id]+=s.hours;
+      return `<td style="text-align:center"><span class="pill p-done">${toHHMM(s.from)}–${toHHMM(s.to)}</span></td>`;
+    }).join("");
+    return `<tr><td class="name">${DAY_GR[d]}<div class="muted mono">${hrs[d].open}–${hrs[d].close}</div></td>${cells}</tr>`;
+  }).join("");
+  box.innerHTML=`<table><thead><tr><th>Ημέρα</th>${emps.map(e=>`<th style="text-align:center">${esc(e.name)}${e.role?`<div class="muted" style="font-weight:400">${esc(e.role)}</div>`:""}</th>`).join("")}</tr></thead>
+    <tbody>${body}
+    <tr style="background:#FAFBFA"><td class="name">Σύνολο ωρών</td>${emps.map(e=>`<td class="mono" style="text-align:center;font-weight:600">${totalH[e.id].toFixed(1)}h</td>`).join("")}</tr>
+    </tbody></table>`;
+}
+function sheetShift(){
+  const {hrs,emps}=shiftData();
+  const rows=[["Ημέρα","Ωράριο"].concat(emps.map(e=>e.name+(e.role?` (${e.role})`:"")))];
+  const totals={}; emps.forEach(e=>totals[e.id]=0);
+  DAYS.forEach(d=>{
+    if(hrs[d].closed){ rows.push([DAY_GR[d],"Κλειστά"].concat(emps.map(()=>"—"))); return; }
+    rows.push([DAY_GR[d],`${hrs[d].open}–${hrs[d].close}`].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return `${toHHMM(s.from)}–${toHHMM(s.to)}`; })));
+  });
+  rows.push(["Σύνολο ωρών",""].concat(emps.map(e=>totals[e.id].toFixed(1)+"h")));
+  return {name:"Πρόγραμμα εργασίας",widths:[14,16].concat(emps.map(()=>18)),rows};
+}
+
+function renderStaffCounts(){
+  const n = isAdmin() ? DB.staffReq.filter(r=>r.status!=="done").length : 0;
+  const el=$("#nStaff"); if(el) el.textContent=n?String(n):"";
+}
+function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShift(); renderStaffCounts(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
 function openClient(id){
@@ -2275,6 +2557,14 @@ function bind(){
     if(email.indexOf("@")>0) return mailDialog({id:null,name:name||"συνεργάτη",email},null);
     toast("Συμπληρώστε πρώτα email.",true);
   };
+  $("#rqAdd").onclick=addStaffReq;
+  $("#empAdd").onclick=addEmp;
+  $("#expShift").onclick=()=>download(`Programma_Ergasias_${todayISO()}.xlsx`,xlsx([sheetShift()]));
+  document.addEventListener("change",async ev=>{
+    const s=ev.target.closest("select[data-reqst]"); if(!s) return;
+    const r=DB.staffReq.find(x=>x.id===s.dataset.reqst);
+    if(r){ r.status=s.value; logIt(`Αίτημα «${r.position}» → ${REQ_ST[s.value]}`,"sys",""); await persist(); }
+  });
   $("#svcAdd").onclick=async()=>{
     const v=$("#svcNew").value.trim();
     if(!v) return;
@@ -2347,9 +2637,21 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-reqdel],button[data-reqcv],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
+
+    if(d.reqdel){
+      const r=DB.staffReq.find(x=>x.id===d.reqdel);
+      if(r&&confirm(`Διαγραφή αιτήματος «${r.position}»;`)){ DB.staffReq=DB.staffReq.filter(x=>x.id!==d.reqdel); await persist(); toast("Διαγράφηκε."); }
+      return;
+    }
+    if(d.reqcv){ if(isAdmin()) sendCV(d.reqcv); return; }
+    if(d.empdel){
+      const em=DB.employees.find(x=>x.id===d.empdel);
+      if(em&&confirm(`Διαγραφή υπαλλήλου «${em.name}»;`)){ DB.employees=DB.employees.filter(x=>x.id!==d.empdel); await persist(); toast("Διαγράφηκε."); }
+      return;
+    }
 
     if(d.pwedit){ if(isAdmin()) pwEditDialog(d.pwedit); return; }
     if(d.pwdel){
