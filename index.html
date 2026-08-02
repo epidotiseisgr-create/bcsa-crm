@@ -556,7 +556,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.4 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.5 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -888,30 +888,21 @@ function chooseExport(kind){
     <div class="modal-b">
       <p class="muted">Το αρχείο αποθηκεύεται στη συσκευή σας (κινητό, tablet ή υπολογιστή) και ανοίγει με τη σχετική εφαρμογή.</p>
       <div class="row-end" style="justify-content:flex-start">
-        <button class="btn brass" id="exImg">📷 Εικόνα (PNG)</button>
+        <button class="btn brass" id="exImg">📷 Εικόνα (JPG)</button>
         <button class="btn brass" id="exPdf">📄 PDF</button>
         <button class="btn brass" id="exXls">📊 Excel</button>
       </div>
-      ${kind!=="day"?'<p class="muted" style="margin-top:12px">Εικόνα/PDF με κόκκινες ενδείξεις διαθεσιμότητας υποστηρίζονται στο <b>Ημερήσιο</b>. Για εβδομάδα/μήνα, το Excel δίνει την πλήρη μορφοποίηση.</p>':""}
     </div>`;
   $("#back").classList.add("on");
   $("#exX").onclick=closeModal;
-  const stamp2=todayISO();
-  $("#exImg").onclick=async()=>{
-    closeModal();
-    if(kind==="day"){
-      const cv=await renderDayCanvas(2);
-      cv.toBlob(b=>download(`Programma_${dayCur}.png`,b),"image/png");
-    }else{ toast("Η εικόνα υποστηρίζεται στο ημερήσιο. Χρήση Excel για εβδομάδα/μήνα.",true); }
+  const canvasFor=async()=>{
+    if(kind==="day") return await renderDayCanvas(2);
+    if(kind==="week"){ const g=weekGrid(); return await gridCanvas(g.title,g.sub,g.headers,g.rows,{rowH:34}); }
+    const g=monthGrid(); return await gridCanvas(g.title,g.sub,g.headers,g.rows,{rowH:34,colW:g.colW});
   };
-  $("#exPdf").onclick=async()=>{
-    closeModal();
-    if(kind==="day"){
-      const cv=await renderDayCanvas(2);
-      const j=await canvasToJpegU8(cv,0.9);
-      download(`Programma_${dayCur}.pdf`, jpegPdf(j,cv.width,cv.height));
-    }else{ toast("Το PDF υποστηρίζεται στο ημερήσιο. Χρήση Excel για εβδομάδα/μήνα.",true); }
-  };
+  const fname=kind==="day"?`Programma_${dayCur}`:kind==="week"?`Programma_Evdomadiaio_${iso(wkCur)}`:`Programma_Miniaio_${mCur.getFullYear()}-${String(mCur.getMonth()+1).padStart(2,"0")}`;
+  $("#exImg").onclick=async()=>{ closeModal(); toast("Δημιουργία εικόνας…"); const cv=await canvasFor(); cv.toBlob(b=>download(fname+".jpg",b),"image/jpeg",0.92); };
+  $("#exPdf").onclick=async()=>{ closeModal(); toast("Δημιουργία PDF…"); const cv=await canvasFor(); const j=await canvasToJpegU8(cv,0.9); download(fname+".pdf", jpegPdf(j,cv.width,cv.height)); };
   $("#exXls").onclick=()=>{
     closeModal();
     if(kind==="day") download(`Programma_Imerisio_${dayCur}.xlsx`,xlsxStyled(schedDay()));
@@ -922,6 +913,111 @@ function chooseExport(kind){
 
 /* Πλέγμα 15λέπτου */
 const SLOT_START=8, SLOT_END=21;
+/* Γενικός πίνακας σε canvas — για εβδομαδιαίο/μηνιαίο/πρόγραμμα εργασίας */
+async function gridCanvas(title,subtitle,headers,rows,opt){
+  opt=opt||{};
+  const S=2, pad=26, headH=112, footH=30;
+  const colWs = Array.isArray(opt.colW) ? opt.colW : headers.map(()=>opt.colW||Math.max(120,Math.floor(((opt.width||900)-pad*2)/headers.length)));
+  const colX = i=>pad+colWs.slice(0,i).reduce((a,b)=>a+b,0);
+  const W=pad*2+colWs.reduce((a,b)=>a+b,0);
+  const rowH=opt.rowH||34, thH=34;
+  const H=headH+thH+rows.length*rowH+footH+pad;
+  const cv=document.createElement("canvas");
+  cv.width=W*S; cv.height=H*S;
+  const x=cv.getContext("2d"); x.scale(S,S);
+  x.fillStyle="#FFFFFF"; x.fillRect(0,0,W,H);
+  x.fillStyle="#10242B"; x.fillRect(0,0,W,headH);
+  x.fillStyle="#B0842F"; x.fillRect(0,headH,W,3);
+  const p=prof();
+  const drawLogo=(cb)=>{ const src=p.logo||brandLogo(); if(!src){cb();return;} const im=new Image(); im.onload=()=>{ try{ x.save(); x.beginPath(); x.arc(pad+24,50,24,0,7); x.closePath(); x.fillStyle="#fff"; x.fill(); x.clip(); x.drawImage(im,pad,26,48,48); x.restore(); }catch(e){} cb(true); }; im.onerror=()=>cb(); im.src=src; };
+  return new Promise(resolve=>{
+    drawLogo((hasLogo)=>{
+      const tx=pad+(hasLogo?64:0);
+      x.fillStyle="#FFFFFF"; x.font="700 20px Georgia, serif"; x.fillText(p.brand||"Business Consultancy Services and Academy",tx,44);
+      x.fillStyle="#C9D6DA"; x.font="14px Arial"; x.fillText(title,tx,68);
+      x.fillStyle="#B0842F"; x.font="700 14px Arial"; x.fillText(subtitle,tx,90);
+      let yy=headH;
+      x.fillStyle="#EFE6D2"; x.fillRect(0,yy,W,thH);
+      x.fillStyle="#6E5015"; x.font="700 12.5px Arial";
+      headers.forEach((h,i)=>{ String(h).split("\n").forEach((ln,li)=>x.fillText(ln,colX(i)+8,yy+(String(h).includes("\n")?16+li*13:22),colWs[i]-12)); });
+      yy+=thH;
+      x.font="12.5px Arial";
+      rows.forEach((r,ri)=>{
+        if(ri%2){ x.fillStyle="#FAFBFA"; x.fillRect(0,yy,W,rowH); }
+        r.forEach((c,i)=>{
+          x.fillStyle=i===0?"#10242B":"#26424B";
+          x.font=(i===0?"700 ":"")+"12px Arial";
+          const lines=String(c==null?"":c).split("\n");
+          const maxL=Math.min(lines.length,Math.floor(rowH/14));
+          lines.slice(0,maxL).forEach((ln,li)=>x.fillText(ln,colX(i)+8,yy+15+li*14,colWs[i]-12));
+        });
+        x.strokeStyle="#EAEEEB"; x.lineWidth=1; x.beginPath(); x.moveTo(0,yy+rowH); x.lineTo(W,yy+rowH); x.stroke();
+        yy+=rowH;
+      });
+      x.strokeStyle="#EAEEEB";
+      for(let i=1;i<headers.length;i++){ x.beginPath(); x.moveTo(colX(i),headH); x.lineTo(colX(i),yy); x.stroke(); }
+      x.fillStyle="#7C929B"; x.font="11px Arial";
+      x.fillText(`Δημιουργήθηκε: ${stamp(Date.now())} · CRM — Business Consultancy Services and Academy · Ευάγγελος Γκούλιος`,pad,H-12);
+      resolve(cv);
+    });
+  });
+}
+/* Δεδομένα εβδομαδιαίου/μηνιαίου ως πίνακας (για εικόνα/PDF) */
+function weekGrid(){
+  const start=wkCur, headers=["Ώρα"].concat(DAYS.map((d,i)=>{ const dt=new Date(start); dt.setDate(start.getDate()+i); return `${DAY_GR[d].slice(0,3)} ${dt.getDate()}/${dt.getMonth()+1}`; }));
+  const times=[]; for(let h=SLOT_START;h<=SLOT_END;h++) times.push(`${String(h).padStart(2,"0")}:00`);
+  const rows=times.map(t=>{
+    const hh=t.slice(0,2);
+    return [t].concat(DAYS.map((d,i)=>{ const dt=new Date(start); dt.setDate(start.getDate()+i); const key=iso(dt);
+      const hits=mineA().filter(a=>a.date===key&&a.time.slice(0,2)===hh&&a.status!=="cancelled");
+      return hits.map(a=>`${a.time} ${a.clientName}`).join("\n");
+    }));
+  });
+  return {headers,rows,title:"Εβδομαδιαίο Πρόγραμμα",sub:`${grDate(iso(start))} – ${grDate(iso(new Date(start.getFullYear(),start.getMonth(),start.getDate()+6)))}`};
+}
+function monthGrid(){
+  const y=mCur.getFullYear(), m=mCur.getMonth();
+  const first=new Date(y,m,1), days=new Date(y,m+1,0).getDate();
+  const rows=[];
+  for(let dnum=1;dnum<=days;dnum++){
+    const dt=new Date(y,m,dnum), key=iso(dt);
+    const hits=mineA().filter(a=>a.date===key&&a.status!=="cancelled").sort((a,b)=>a.time.localeCompare(b.time));
+    rows.push([`${dnum}/${m+1} ${DAY_GR[DAYS[(dt.getDay()+6)%7]].slice(0,3)}`, hits.length?hits.map(a=>`${a.time} ${a.clientName}`).join("\n"):"—"]);
+  }
+  return {headers:["Ημέρα","Ραντεβού"],rows,title:"Μηνιαίο Πρόγραμμα",sub:`${["Ιαν","Φεβ","Μαρ","Απρ","Μαϊ","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"][m]} ${y}`,colW:[110,760]};
+}
+async function shiftCanvas(){
+  const {hrs,emps}=shiftData();
+  const headers=["Ημέρα"].concat(emps.map(e=>e.name+(e.role?`\n${e.role}`:"")));
+  const totals={}; emps.forEach(e=>totals[e.id]=0);
+  const rows=DAYS.map(d=>{
+    if(hrs[d].closed) return [DAY_GR[d]].concat(emps.map(()=>"Κλειστά"));
+    return [`${DAY_GR[d]}\n${hoursLabel(hrs[d])}`].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return s.label; }));
+  });
+  rows.push(["Σύνολο"].concat(emps.map(e=>totals[e.id].toFixed(1)+"h")));
+  return gridCanvas("Πρόγραμμα Εργασίας",prof().brand||"",headers,rows,{rowH:40});
+}
+function chooseShiftExport(){
+  const {emps}=shiftData();
+  if(!emps.length){ toast("Προσθέστε πρώτα υπαλλήλους.",true); return; }
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Εξαγωγή προγράμματος εργασίας</h3><div class="muted">Προσωπικό σε στήλες, ημέρες σε γραμμές</div></div><button class="btn ghost sm" id="shX">✕</button></div>
+    <div class="modal-b">
+      <p class="muted">Αποθηκεύεται στη συσκευή (κινητό, tablet, υπολογιστή).</p>
+      <div class="row-end" style="justify-content:flex-start">
+        <button class="btn brass" id="shImg">📷 Εικόνα (JPG)</button>
+        <button class="btn brass" id="shPdf">📄 PDF</button>
+        <button class="btn brass" id="shXls">📊 Excel</button>
+      </div>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#shX").onclick=closeModal;
+  const fn=`Programma_Ergasias_${todayISO()}`;
+  $("#shImg").onclick=async()=>{ closeModal(); toast("Δημιουργία εικόνας…"); const cv=await shiftCanvas(); cv.toBlob(b=>download(fn+".jpg",b),"image/jpeg",0.92); };
+  $("#shPdf").onclick=async()=>{ closeModal(); toast("Δημιουργία PDF…"); const cv=await shiftCanvas(); const j=await canvasToJpegU8(cv,0.9); download(fn+".pdf",jpegPdf(j,cv.width,cv.height)); };
+  $("#shXls").onclick=()=>{ closeModal(); download(fn+".xlsx",xlsx([sheetShift()])); };
+}
 function slots15(){
   const out=[];
   for(let h=SLOT_START;h<=SLOT_END;h++)
@@ -1983,8 +2079,17 @@ const REJECT_REASON={incomplete:"Ελλιπείς πληροφορίες — π�
 const DAYS=["mon","tue","wed","thu","fri","sat","sun"];
 const mineReq=()=>DB.staffReq.filter(r=>inScope(r.owner));
 const mineEmp=()=>DB.employees.filter(e=>inScope(e.owner));
-const myHours=()=>{ const id=writeOwner(); if(!DB.shophours[id]) DB.shophours[id]=defHours(); return DB.shophours[id]; };
-function defHours(){ const h={}; DAYS.forEach((d,i)=>h[d]={closed:i>=5,open:"09:00",close:"21:00"}); return h; }
+const myHours=()=>{ const id=writeOwner(); if(!DB.shophours[id]) DB.shophours[id]=defHours(); return normHours(DB.shophours[id]); };
+function defHours(){ const h={}; DAYS.forEach((d,i)=>h[d]={closed:i>=5,open:"09:00",close:"21:00",open2:"",close2:""}); return h; }
+/* Συμβατότητα: παλιές εγγραφές {open,close} → προσθέτουμε πεδία 2ου διαστήματος */
+function normHours(h){ const o={}; DAYS.forEach(d=>{ const x=h[d]||{}; o[d]={closed:!!x.closed,open:x.open||"09:00",close:x.close||"21:00",open2:x.open2||"",close2:x.close2||""}; }); return o; }
+/* Τμήματα (λεπτά) ωραρίου καταστήματος για μια ημέρα */
+function storeSegs(day){
+  if(day.closed) return [];
+  const s=[]; const a=toMin(day.open),b=toMin(day.close); if(b>a) s.push([a,b]);
+  if(day.open2&&day.close2){ const c=toMin(day.open2),e=toMin(day.close2); if(e>c) s.push([c,e]); }
+  return s;
+}
 
 /* --- Ζήτηση προσωπικού (χρήστης) --- */
 async function addStaffReq(){
@@ -2007,6 +2112,7 @@ function renderMyReq(){
       <div><b>${esc(r.position)}</b> <span class="pill p-sched">${EMP_TYPE[r.type]||r.type}</span> <span class="pill ${REQ_PILL[r.status]||"p-past"}">${REQ_ST[r.status]||r.status}</span>
         ${r.note?`<div class="t">${esc(r.note)}</div>`:""}
         ${r.status==="rejected"&&r.reason?`<div class="t" style="color:#A83A2C">Αιτιολογία: ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}
+        ${(r.cvs&&r.cvs.length)?`<div class="t" style="margin-top:4px"><b>Βιογραφικά που λάβατε:</b>${r.cvs.map(cv=>`<div style="margin-top:3px">📎 <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0">${esc(cv.link)}</a>${cv.note?` <span class="muted">— ${esc(cv.note)}</span>`:""}</div>`).join("")}</div>`:""}
         <div class="muted">${stamp(r.ts)}</div></div>
       <div class="appt-actions">${r.status==="pending"||r.status==="rejected"?`<button class="btn danger sm" data-reqdel="${r.id}">✕</button>`:""}</div>
     </div>`).join("") : "";
@@ -2082,8 +2188,12 @@ function sendCV(reqId){
   $("#cvX").onclick=closeModal;
   $("#cvMailers").innerHTML=`<button class="btn brass" id="cvSend">Καταχώριση & ειδοποίηση χρήστη</button>`+MAILERS.map(m=>`<button class="btn ghost" data-cvm="${m.k}">${m.n}</button>`).join("");
   const doNotify=async()=>{
-    const link=$("#cvLink").value.trim();
-    if(link){ notify(r.owner,`Βιογραφικά για «${r.position}»: ${link}${$("#cvNote").value.trim()?" — "+$("#cvNote").value.trim():""}`); }
+    const link=$("#cvLink").value.trim(), note=$("#cvNote").value.trim();
+    if(link){
+      if(!Array.isArray(r.cvs)) r.cvs=[];
+      r.cvs.push({link,note,ts:Date.now()});
+      notify(r.owner,`Βιογραφικά για «${r.position}»: ${link}${note?" — "+note:""}`);
+    }
     r.status="accepted"; logIt(`Αποστολή βιογραφικών για «${r.position}» → ${r.ownerLabel}`,"sys","");
     await persist();
   };
@@ -2103,27 +2213,28 @@ const DAY_GR={mon:"Δευτέρα",tue:"Τρίτη",wed:"Τετάρτη",thu:"Π
 function renderHours(){
   const box=$("#hoursBox"); if(!box) return;
   const h=myHours();
-  box.innerHTML=`<table><thead><tr><th>Ημέρα</th><th>Κλειστά</th><th>Άνοιγμα</th><th>Κλείσιμο</th></tr></thead><tbody>${
+  box.innerHTML=`<table><thead><tr><th>Ημέρα</th><th>Κλειστά</th><th>Πρωί/Α΄ βάρδια</th><th>Απόγευμα/Β΄ βάρδια <span class="muted">(προαιρετικό)</span></th></tr></thead><tbody>${
     DAYS.map(d=>`<tr>
       <td class="name">${DAY_GR[d]}</td>
       <td><input type="checkbox" data-hclosed="${d}" ${h[d].closed?"checked":""} style="width:auto"></td>
-      <td><input type="time" data-hopen="${d}" value="${h[d].open}" ${h[d].closed?"disabled":""} style="width:auto"></td>
-      <td><input type="time" data-hclose="${d}" value="${h[d].close}" ${h[d].closed?"disabled":""} style="width:auto"></td>
+      <td style="white-space:nowrap"><input type="time" data-hopen="${d}" value="${h[d].open}" ${h[d].closed?"disabled":""} style="width:auto"> <span class="muted">–</span> <input type="time" data-hclose="${d}" value="${h[d].close}" ${h[d].closed?"disabled":""} style="width:auto"></td>
+      <td style="white-space:nowrap"><input type="time" data-hopen2="${d}" value="${h[d].open2}" ${h[d].closed?"disabled":""} style="width:auto"> <span class="muted">–</span> <input type="time" data-hclose2="${d}" value="${h[d].close2}" ${h[d].closed?"disabled":""} style="width:auto"></td>
     </tr>`).join("")}</tbody></table>
-    <div class="row-end" style="margin-top:12px"><button class="btn brass sm" id="hoursSave">Αποθήκευση ωραρίου</button></div>`;
+    <div class="row-end" style="margin-top:12px"><button class="btn brass sm" id="hoursSave">Αποθήκευση ωραρίου</button></div>
+    <p class="muted" style="margin-top:8px">Το ωράριο μπορεί να είναι σπαστό: π.χ. 09:00–14:00 και 17:00–21:00. Αφήστε το δεύτερο διάστημα κενό αν είναι συνεχές.</p>`;
   $("#hoursSave").onclick=async()=>{
     const id=writeOwner(); const nh={};
-    DAYS.forEach(d=>{ nh[d]={closed:$(`[data-hclosed="${d}"]`).checked,open:$(`[data-hopen="${d}"]`).value||"09:00",close:$(`[data-hclose="${d}"]`).value||"21:00"}; });
+    DAYS.forEach(d=>{ nh[d]={closed:$(`[data-hclosed="${d}"]`).checked,open:$(`[data-hopen="${d}"]`).value||"09:00",close:$(`[data-hclose="${d}"]`).value||"21:00",open2:$(`[data-hopen2="${d}"]`).value||"",close2:$(`[data-hclose2="${d}"]`).value||""}; });
     DB.shophours[id]=nh; await persist(); toast("Το ωράριο αποθηκεύτηκε.");
   };
-  $$('[data-hclosed]').forEach(cb=>cb.onchange=()=>{ const d=cb.dataset.hclosed; $(`[data-hopen="${d}"]`).disabled=cb.checked; $(`[data-hclose="${d}"]`).disabled=cb.checked; });
+  $$('[data-hclosed]').forEach(cb=>cb.onchange=()=>{ const d=cb.dataset.hclosed; [`[data-hopen="${d}"]`,`[data-hclose="${d}"]`,`[data-hopen2="${d}"]`,`[data-hclose2="${d}"]`].forEach(s=>$(s).disabled=cb.checked); });
 }
 
 /* --- Υπάλληλοι & διαθεσιμότητα --- */
 async function addEmp(){
   const name=$("#empName").value.trim();
   if(!name){ toast("Συμπληρώστε όνομα υπαλλήλου.",true); return; }
-  const avail={}; DAYS.forEach(d=>avail[d]={mode:"yes",from:"",to:""});
+  const avail={}; DAYS.forEach(d=>avail[d]={mode:"yes",from:"",to:"",from2:"",to2:""});
   DB.employees.push({id:uid(),owner:writeOwner(),name,role:$("#empRole").value.trim(),avail});
   $("#empName").value=""; $("#empRole").value="";
   await persist(); toast("Ο υπάλληλος προστέθηκε.");
@@ -2139,48 +2250,59 @@ function renderEmp(){
         <button class="btn danger sm" data-empdel="${e.id}">✕ Διαγραφή</button>
       </div>
       <div class="panel-b" style="padding:12px 14px">
-        <div class="sec-t">Διαθεσιμότητα ανά ημέρα</div>
+        <div class="sec-t">Σταθερή εβδομαδιαία διαθεσιμότητα</div>
         <table><tbody>${DAYS.map(d=>{
           const a=e.avail[d]||{mode:"yes"};
           return `<tr>
-            <td class="name" style="width:90px">${DAY_GR[d]}</td>
-            <td style="width:150px"><select data-empmode="${e.id}:${d}" style="width:100%;padding:5px 6px;font-size:12.5px">
-              <option value="yes" ${a.mode==="yes"?"selected":""}>Διαθέσιμος</option>
+            <td class="name" style="width:84px;vertical-align:top;padding-top:10px">${DAY_GR[d]}</td>
+            <td style="width:135px;vertical-align:top;padding-top:6px"><select data-empmode="${e.id}:${d}" style="width:100%;padding:5px 6px;font-size:12.5px">
+              <option value="yes" ${a.mode==="yes"?"selected":""}>Διαθέσιμος (όλη μέρα)</option>
               <option value="no" ${a.mode==="no"?"selected":""}>Μη διαθέσιμος</option>
               <option value="partial" ${a.mode==="partial"?"selected":""}>Μόνο ώρες…</option>
             </select></td>
-            <td>${a.mode==="partial"?`<span class="muted">από</span> <input type="time" data-empfrom="${e.id}:${d}" value="${a.from||""}" style="width:auto"> <span class="muted">έως</span> <input type="time" data-empto="${e.id}:${d}" value="${a.to||""}" style="width:auto">`:""}</td>
+            <td style="vertical-align:top;padding-top:6px">${a.mode==="partial"?`
+              <div style="white-space:nowrap;margin-bottom:4px"><span class="muted">Α΄</span> <input type="time" data-empfrom="${e.id}:${d}" value="${a.from||""}" style="width:auto"> <span class="muted">–</span> <input type="time" data-empto="${e.id}:${d}" value="${a.to||""}" style="width:auto"></div>
+              <div style="white-space:nowrap"><span class="muted">Β΄</span> <input type="time" data-empfrom2="${e.id}:${d}" value="${a.from2||""}" style="width:auto"> <span class="muted">–</span> <input type="time" data-empto2="${e.id}:${d}" value="${a.to2||""}" style="width:auto"> <span class="muted" style="font-size:11px">(προαιρετικό)</span></div>`:""}</td>
           </tr>`;
         }).join("")}</tbody></table>
       </div>
     </div>`).join("");
-  // handlers
-  $$('[data-empmode]').forEach(sel=>sel.onchange=async()=>{
-    const [id,d]=sel.dataset.empmode.split(":"); const e=DB.employees.find(x=>x.id===id); if(!e) return;
-    e.avail[d].mode=sel.value; await persist();
+  const upd=(sel,attr,field)=>$$(`[data-${attr}]`).forEach(el=>el.onchange=async()=>{
+    const [id,d]=el.dataset[attr].split(":"); const e=DB.employees.find(x=>x.id===id); if(!e) return;
+    if(!e.avail[d]) e.avail[d]={mode:"yes"};
+    e.avail[d][field]=el.value; await persist(); if(field==="mode") renderEmp();
   });
-  $$('[data-empfrom]').forEach(inp=>inp.onchange=async()=>{ const [id,d]=inp.dataset.empfrom.split(":"); const e=DB.employees.find(x=>x.id===id); if(e){ e.avail[d].from=inp.value; await persist(); } });
-  $$('[data-empto]').forEach(inp=>inp.onchange=async()=>{ const [id,d]=inp.dataset.empto.split(":"); const e=DB.employees.find(x=>x.id===id); if(e){ e.avail[d].to=inp.value; await persist(); } });
+  upd("select","empmode","mode"); upd("input","empfrom","from"); upd("input","empto","to");
+  upd("input","empfrom2","from2"); upd("input","empto2","to2");
 }
 
 /* --- Υπολογισμός προγράμματος: τομή ωραρίου καταστήματος × διαθεσιμότητας --- */
 const toMin=t=>{ const [h,m]=String(t||"").split(":").map(Number); return (h||0)*60+(m||0); };
 const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
-function empShift(e,d,hrs){
-  const day=hrs[d]; if(day.closed) return null;
-  const a=e.avail[d]||{mode:"yes"};
-  if(a.mode==="no") return null;
-  let from=toMin(day.open), to=toMin(day.close);
-  if(a.mode==="partial"){
-    if(a.from) from=Math.max(from,toMin(a.from));
-    if(a.to) to=Math.min(to,toMin(a.to));
-  }
-  if(to<=from) return null;
-  return {from,to,hours:Math.round((to-from)/6)/10};
+/* Τμήματα διαθεσιμότητας υπαλλήλου (λεπτά) για μια ημέρα */
+function availSegs(e,d){
+  const a=(e.avail&&e.avail[d])||{mode:"yes"};
+  if(a.mode==="no") return [];
+  if(a.mode==="yes") return [[0,1440]];
+  const s=[];
+  if(a.from&&a.to){ const x=toMin(a.from),y=toMin(a.to); if(y>x) s.push([x,y]); }
+  if(a.from2&&a.to2){ const x=toMin(a.from2),y=toMin(a.to2); if(y>x) s.push([x,y]); }
+  return s;
 }
+/* Επιστρέφει λίστα τμημάτων βάρδιας [[from,to],...] και σύνολο ωρών */
+function empShift(e,d,hrs){
+  const day=hrs[d]; if(!day||day.closed) return null;
+  const store=storeSegs(day), av=availSegs(e,d);
+  const out=[];
+  store.forEach(([sa,sb])=>av.forEach(([aa,ab])=>{ const f=Math.max(sa,aa),t=Math.min(sb,ab); if(t>f) out.push([f,t]); }));
+  if(!out.length) return null;
+  out.sort((a,b)=>a[0]-b[0]);
+  const mins=out.reduce((s,[f,t])=>s+(t-f),0);
+  return {segs:out, hours:Math.round(mins/6)/10, label:out.map(([f,t])=>`${toHHMM(f)}–${toHHMM(t)}`).join(", ")};
+}
+const hoursLabel=day=>day.closed?"Κλειστά":storeSegs(day).map(([f,t])=>`${toHHMM(f)}–${toHHMM(t)}`).join(", ");
 function shiftData(){
-  const hrs = isAdmin()&&viewScope!=="all"&&viewScope!=="self" ? (DB.shophours[viewScope]||defHours())
-            : (DB.shophours[writeOwner()]||myHours());
+  const hrs = isAdmin()&&viewScope!=="all"&&viewScope!=="self" ? normHours(DB.shophours[viewScope]||defHours()) : myHours();
   const emps=mineEmp();
   return {hrs,emps};
 }
@@ -2195,9 +2317,9 @@ function renderShift(){
       const s=empShift(e,d,hrs);
       if(!s) return `<td class="muted" style="text-align:center">—</td>`;
       totalH[e.id]+=s.hours;
-      return `<td style="text-align:center"><span class="pill p-done">${toHHMM(s.from)}–${toHHMM(s.to)}</span></td>`;
+      return `<td style="text-align:center">${s.segs.map(([f,t])=>`<span class="pill p-done" style="margin:1px 0;display:inline-block">${toHHMM(f)}–${toHHMM(t)}</span>`).join("<br>")}</td>`;
     }).join("");
-    return `<tr><td class="name">${DAY_GR[d]}<div class="muted mono">${hrs[d].open}–${hrs[d].close}</div></td>${cells}</tr>`;
+    return `<tr><td class="name">${DAY_GR[d]}<div class="muted mono" style="font-size:10.5px">${hoursLabel(hrs[d])}</div></td>${cells}</tr>`;
   }).join("");
   box.innerHTML=`<table><thead><tr><th>Ημέρα</th>${emps.map(e=>`<th style="text-align:center">${esc(e.name)}${e.role?`<div class="muted" style="font-weight:400">${esc(e.role)}</div>`:""}</th>`).join("")}</tr></thead>
     <tbody>${body}
@@ -2210,10 +2332,10 @@ function sheetShift(){
   const totals={}; emps.forEach(e=>totals[e.id]=0);
   DAYS.forEach(d=>{
     if(hrs[d].closed){ rows.push([DAY_GR[d],"Κλειστά"].concat(emps.map(()=>"—"))); return; }
-    rows.push([DAY_GR[d],`${hrs[d].open}–${hrs[d].close}`].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return `${toHHMM(s.from)}–${toHHMM(s.to)}`; })));
+    rows.push([DAY_GR[d],hoursLabel(hrs[d])].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return s.label; })));
   });
   rows.push(["Σύνολο ωρών",""].concat(emps.map(e=>totals[e.id].toFixed(1)+"h")));
-  return {name:"Πρόγραμμα εργασίας",widths:[14,16].concat(emps.map(()=>18)),rows};
+  return {name:"Πρόγραμμα εργασίας",widths:[14,20].concat(emps.map(()=>20)),rows};
 }
 
 function renderStaffCounts(){
@@ -2711,7 +2833,7 @@ function bind(){
   };
   $("#rqAdd").onclick=addStaffReq;
   $("#empAdd").onclick=addEmp;
-  $("#expShift").onclick=()=>download(`Programma_Ergasias_${todayISO()}.xlsx`,xlsx([sheetShift()]));
+  $("#expShift").onclick=()=>chooseShiftExport();
   $("#svcAdd").onclick=async()=>{
     const v=$("#svcNew").value.trim();
     if(!v) return;
