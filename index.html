@@ -248,6 +248,7 @@
     <div class="head-meta">
       <strong id="todayLabel">—</strong>
       <button class="chip" id="bellChip" title="Ειδοποιήσεις"><span id="bellIco">🔔</span><span id="bellBadge" class="bellbadge"></span></button>
+      <button class="chip" id="logoutChip" title="Αποσύνδεση">⎋ Έξοδος</button>
       <button class="chip" id="syncChip"><i></i><span id="syncTxt">Φόρτωση…</span></button>
       <button class="chip" id="notifChip"><i></i><span id="notifTxt">Ειδοποιήσεις</span></button>
     </div>
@@ -509,10 +510,6 @@
       <div class="panel-h"><h2>Διαχείριση κωδικών εισόδου</h2><span class="sub">Μόνο διαχειριστής</span></div>
       <div class="panel-b"><div id="pwAdmin"></div></div>
     </div>
-    <div class="panel" style="margin-bottom:22px" id="admUsersPanel">
-      <div class="panel-h"><h2>Εποπτεία χρηστών &amp; Εξαγωγή</h2><span class="sub">Μόνο διαχειριστής</span></div>
-      <div class="panel-b"><div id="usersAdmin"></div></div>
-    </div>
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Στοιχεία επιχείρησης</h2><span class="sub">Επωνυμία, λογότυπο, τύπος</span></div>
       <div class="panel-b"><div id="bizBox"></div></div>
@@ -533,7 +530,7 @@
     </div>
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Σύνοψη βάσης</h2><span class="sub" id="dbStamp">—</span></div>
-      <div class="panel-b"><div class="cards" id="stats"></div></div>
+      <div class="panel-b"><div id="statsScopeBar" style="display:none;margin-bottom:12px"></div><div class="cards" id="stats"></div></div>
     </div>
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Χειροκίνητη εξαγωγή</h2><span class="sub">Excel / JSON</span></div>
@@ -545,17 +542,21 @@
         <p class="muted" style="margin-top:12px">Το βιβλίο περιέχει τρία φύλλα: Πελάτες, Ραντεβού, Ιστορικό.</p>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Επαναφορά &amp; διαγραφή</h2><span class="sub">Προσοχή</span></div>
       <div class="panel-b">
         <div class="field"><label for="impFile">Εισαγωγή backup (.json)</label><input type="file" id="impFile" accept="application/json,.json"></div>
         <div class="row-end" style="justify-content:flex-start"><button class="btn danger" id="wipe">Διαγραφή όλων των δεδομένων</button></div>
       </div>
     </div>
+    <div class="panel" id="admUsersPanel">
+      <div class="panel-h"><h2>Εποπτεία χρηστών &amp; Εξαγωγή</h2><span class="sub">Μόνο διαχειριστής</span></div>
+      <div class="panel-b"><div id="usersAdmin"></div></div>
+    </div>
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.3 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.4 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1043,6 +1044,7 @@ const norm=d=>{
   if(!Array.isArray(o.employees)) o.employees=[];
   if(!o.shophours||typeof o.shophours!=="object") o.shophours={};
   if(!Array.isArray(o.notif)) o.notif=[];
+  if(typeof o.appVersion!=="string") o.appVersion="";
   return o;
 };
 const prof=()=>DB.profile||DEF_PROFILE;
@@ -1107,7 +1109,7 @@ const allSheets=()=>[sheetClients(mineC()),sheetAppts(apptsSorted()),sheetHist(D
 const BOOTSTRAP_PW=[
   {id:"u_admin", label:"Διαχειριστής (Ε. Γκούλιος)", p:"Vagelhs1990", until:null, admin:true},
   {id:"u_volos", label:"Βόλος",  p:"volos1234",   until:"2026-08-30", admin:false},
-  {id:"u_ksan",  label:"Ξάνθη",  p:"ksanthi2026", until:"2026-09-30", admin:false}
+  {id:"u_ksan",  label:"Ξανθή",  p:"ksanthi2026", until:"2026-09-30", admin:false}
 ];
 const DATA_PW=["bcsa1234","User1234"];
 const KEY="bcsa-crm", FOLDER="CRM_bcsa_Information";
@@ -1682,16 +1684,42 @@ function renderSvcAdmin(){
     ? `<div class="svc">${DB.services.map(s=>`<span class="stag" style="padding:6px 10px;font-size:12.5px;display:inline-flex;gap:8px;align-items:center">${esc(s)} <button class="lnk" data-svcdel="${esc(s)}" style="border:0;color:#A83A2C">✕</button></span>`).join("")}</div>`
     : '<span class="muted">Δεν υπάρχουν υπηρεσίες.</span>';
 }
+let statsScope="self";   // self | all | <userId>
+function statsC(){
+  if(!isAdmin()) return mineC();
+  if(statsScope==="all") return DB.clients.slice();
+  if(statsScope==="self") return DB.clients.filter(c=>(c.owner||"u_admin")===scopeId());
+  return DB.clients.filter(c=>(c.owner||"u_admin")===statsScope);
+}
+function statsA(){
+  if(!isAdmin()) return mineA();
+  if(statsScope==="all") return DB.appointments.slice();
+  if(statsScope==="self") return DB.appointments.filter(a=>(a.owner||"u_admin")===scopeId());
+  return DB.appointments.filter(a=>(a.owner||"u_admin")===statsScope);
+}
+function renderStatsScopeBar(){
+  const bar=$("#statsScopeBar"); if(!bar) return;
+  if(!isAdmin()){ bar.style.display="none"; return; }
+  bar.style.display="";
+  const opts=[`<option value="self">Μόνο εμένα</option>`,`<option value="all">Όλους τους χρήστες</option>`]
+    .concat(allOwners().map(id=>`<option value="${id}">${esc(ownerName(id))}</option>`));
+  bar.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <b style="font-family:'Noto Serif',serif;font-size:13px">Σύνοψη για:</b>
+    <select id="statsSel" style="width:auto;min-width:180px">${opts.join("")}</select></div>`;
+  const sel=$("#statsSel"); sel.value=statsScope;
+  sel.onchange=()=>{ statsScope=sel.value; renderStats(); };
+}
 function renderStats(){
-  const t=todayISO();
+  renderStatsScopeBar();
+  const t=todayISO(), C=statsC(), A=statsA();
   $("#stats").innerHTML=`
-    <div class="stat"><div class="v mono">${mineC().length}</div><div class="l">Πελάτες</div></div>
-    <div class="stat"><div class="v mono">${mineA().length}</div><div class="l">Ραντεβού συνολικά</div></div>
-    <div class="stat"><div class="v mono">${mineA().filter(a=>a.date>=t&&a.status==="scheduled").length}</div><div class="l">Επερχόμενα</div></div>
-    <div class="stat"><div class="v mono">${mineA().filter(a=>a.status==="done").length}</div><div class="l">Ολοκληρωμένα</div></div>
+    <div class="stat"><div class="v mono">${C.length}</div><div class="l">Πελάτες</div></div>
+    <div class="stat"><div class="v mono">${A.length}</div><div class="l">Ραντεβού συνολικά</div></div>
+    <div class="stat"><div class="v mono">${A.filter(a=>a.date>=t&&a.status==="scheduled").length}</div><div class="l">Επερχόμενα</div></div>
+    <div class="stat"><div class="v mono">${A.filter(a=>a.status==="done").length}</div><div class="l">Ολοκληρωμένα</div></div>
     <div class="stat"><div class="v mono">${DB.history.length}</div><div class="l">Εγγραφές ιστορικού</div></div>
-    <div class="stat"><div class="v mono" style="font-size:20px">${eur(mineA().filter(a=>a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Συνολικές εισπράξεις</div></div>
-    <div class="stat"><div class="v mono" style="font-size:20px">${eur(mineA().filter(a=>!a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Εκκρεμείς πληρωμές</div></div>`;
+    <div class="stat"><div class="v mono" style="font-size:20px">${eur(A.filter(a=>a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Συνολικές εισπράξεις</div></div>
+    <div class="stat"><div class="v mono" style="font-size:20px">${eur(A.filter(a=>!a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Εκκρεμείς πληρωμές</div></div>`;
   $("#dbStamp").textContent=DB.updated?"Τελευταία ενημέρωση: "+stamp(DB.updated):"Καμία εγγραφή ακόμη";
   $("#nClients").textContent=mineC().length;
   $("#nHist").textContent=DB.history.length;
@@ -1836,9 +1864,11 @@ function clientsRowsFor(uid){
     return {c,appts:DB.appointments.filter(a=>a.clientId===c.id).length,total,paid,due:Math.round((total-paid)*100)/100};
   });
 }
+const usersOpen={};   // ποιοι χρήστες είναι «ανοιχτοί» (expanded)
 function renderUsers(){
   const wrap=$("#admUsersPanel"), box=$("#usersAdmin"); if(!box) return;
   if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
+  const PREVIEW=2;
   const owners=allOwners().map(id=>({id,rows:clientsRowsFor(id)}))
     .sort((a,b)=>b.rows.length-a.rows.length);
   box.innerHTML=owners.map(o=>{
@@ -1846,16 +1876,19 @@ function renderUsers(){
     const nA=DB.appointments.filter(a=>(a.owner||"u_admin")===o.id).length;
     const paid=o.rows.reduce((s,r)=>s+r.paid,0), due=o.rows.reduce((s,r)=>s+r.due,0);
     const known=(vaultWraps||[]).some(w=>w.id===o.id);
-    const inner = nC ? `<table><thead><tr><th>Ονοματεπώνυμο</th><th>Τηλέφωνο</th><th>Email</th><th style="text-align:center">Ραντεβού</th><th style="text-align:right">Πληρωμένα</th><th style="text-align:right">Υπόλοιπο</th></tr></thead><tbody>${
-        o.rows.map(r=>`<tr>
+    const open=!!usersOpen[o.id];
+    const shown = open ? o.rows : o.rows.slice(0,PREVIEW);
+    const rowHtml=r=>`<tr>
           <td class="name">${esc(r.c.name)}</td>
           <td class="mono muted">${esc(r.c.phone||"—")}</td>
           <td class="muted">${esc(r.c.email||"—")}</td>
           <td class="mono" style="text-align:center">${r.appts}</td>
           <td class="mono money" style="text-align:right">${eur(r.paid)}</td>
           <td class="mono money" style="text-align:right">${r.due?eur(r.due):"—"}</td>
-        </tr>`).join("")
-      }</tbody></table>` : '<div class="muted" style="padding:6px 2px">Χωρίς πελάτες.</div>';
+        </tr>`;
+    const inner = nC ? `<table><thead><tr><th>Ονοματεπώνυμο</th><th>Τηλέφωνο</th><th>Email</th><th style="text-align:center">Ραντεβού</th><th style="text-align:right">Πληρωμένα</th><th style="text-align:right">Υπόλοιπο</th></tr></thead><tbody>${
+        shown.map(rowHtml).join("")
+      }</tbody></table>${ nC>PREVIEW ? `<button class="btn ghost sm" data-utoggle="${o.id}" style="margin-top:8px">${open?"▲ Σύμπτυξη":`▼ Εμφάνιση όλων (${nC})`}</button>` : "" }` : '<div class="muted" style="padding:6px 2px">Χωρίς πελάτες.</div>';
     return `<div class="panel" style="margin-bottom:14px;box-shadow:none;border:1px solid var(--line)">
       <div class="panel-h" style="padding:11px 14px">
         <h2 style="font-size:14px">${esc(ownerName(o.id))} ${known?"":'<span class="pill p-canc">κωδικός διαγράφηκε</span>'}</h2>
@@ -1914,7 +1947,7 @@ const ADMIN_BOX="ADMIN";
 function notify(to,text){ DB.notif.unshift({id:uid(),to,text,ts:Date.now(),read:false}); }
 function myNotifs(){
   if(!currentUser) return [];
-  return DB.notif.filter(n=> n.to===currentUser.id || (isAdmin()&&n.to===ADMIN_BOX));
+  return DB.notif.filter(n=> n.to===currentUser.id || n.to==="ALL" || (isAdmin()&&n.to===ADMIN_BOX));
 }
 function renderBell(){
   const badge=$("#bellBadge"); if(!badge) return;
@@ -2667,6 +2700,7 @@ function bind(){
   $("#fTime").addEventListener("keydown",e=>{ if(e.key==="Enter"){ fixTime(); addEntry(); } });
   $("#notifChip").onclick=askNotif;
   $("#bellChip").onclick=openBell;
+  $("#logoutChip").onclick=()=>{ if(confirm("Αποσύνδεση από το πρόγραμμα;")){ try{ sessionPw=null; dekKey=null; dekRaw=null; currentUser=null; }catch(e){} location.reload(); } };
   $("#fMic").onclick=toggleMic;
   $("#fMail").onclick=()=>{
     const name=$("#fName").value.trim(), email=$("#fEmail").value.trim(), phone=$("#fPhone").value.trim();
@@ -2750,7 +2784,7 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
@@ -2781,6 +2815,7 @@ function bind(){
       return;
     }
     if(d.uexp){ if(isAdmin()) exportUsers(d.uexp); return; }
+    if(d.utoggle){ usersOpen[d.utoggle]=!usersOpen[d.utoggle]; renderUsers(); return; }
 
     if(d.paid){
       const a=DB.appointments.find(x=>x.id===d.paid);
@@ -2879,10 +2914,26 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
+const APP_VERSION="4.4";
+async function versionCheck(){
+  // αυτόματη διόρθωση παλιού label
+  let fixed=false;
+  (vaultWraps||[]).forEach(w=>{ if(w.id==="u_ksan"&&w.label==="Ξάνθη"){ w.label="Ξανθή"; fixed=true; } });
+  const prev=DB.appVersion||"";
+  if(prev===APP_VERSION){ if(fixed) await persist(); return; }
+  const firstEver=!prev;
+  DB.appVersion=APP_VERSION;
+  if(!firstEver){
+    (vaultWraps||[]).forEach(w=>notify(w.id,`Έγινε αναβάθμιση του προγράμματος στην έκδοση ${APP_VERSION}. Τα δεδομένα σας διατηρήθηκαν κανονικά.`));
+    notify(ADMIN_BOX,`Το πρόγραμμα αναβαθμίστηκε στην έκδοση ${APP_VERSION}.`);
+  }
+  await persist();
+}
 async function startApp(){
   const now=new Date();
   $("#todayLabel").textContent=`${DOW[dowIdx(now)]} ${grDate(todayISO())}`;
   $("#fDate").value=todayISO();
+  await versionCheck();
 
   if(FS_OK){
     const h=await IDB.get("dir");
