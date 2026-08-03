@@ -111,6 +111,8 @@
   .p-done{background:var(--sea-soft);color:#125450;border-color:#C3E0DC}
   .p-canc{background:var(--alert-soft);color:#7E2C21;border-color:#EDCCC6}
   .p-past{background:#EDEFED;color:#5B6D74;border-color:#DDE2DE}
+  .p-part{background:#FFF6D9;color:#7A5B10;border-color:#EBD494}
+  .infodot{display:inline-block;margin-left:6px;color:#B58A1E;cursor:help;font-size:13px;font-weight:700}
 
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .toolbar input,.toolbar select{width:auto;min-width:150px}
@@ -575,7 +577,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.1 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.2 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -622,6 +624,39 @@ const safeName = s => String(s).replace(/[\/\\:*?"<>|]/g,"-");
 
 function toast(m,err){ const t=$("#toast"); if(!t) return; t.textContent=m; t.className=err?"err show":"show"; clearTimeout(t._h); t._h=setTimeout(()=>t.className="",3000); }
 function download(name,blob){ const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+/* --- Εξαγωγή/εισαγωγή JSON ανά ενότητα (εξοικονόμηση χρόνου) --- */
+function jsonExport(kind){
+  const id=writeOwner();
+  let data, fn;
+  if(kind==="hours"){ data={type:"bcsa-hours",v:1,hours:myHours()}; fn="Orario_Leitourgias"; }
+  else if(kind==="emps"){ data={type:"bcsa-emps",v:1,employees:mineEmp()}; fn="Ypalliloi"; }
+  else if(kind==="shifts"){ data={type:"bcsa-shifts",v:1,shifts:myShifts()}; fn="Vardies"; }
+  else if(kind==="needs"){ data={type:"bcsa-needs",v:1,shifts:myShifts(),needs:myNeeds()}; fn="Anagkes_Prosopikou"; }
+  else return;
+  download(fn+".json", new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+}
+function jsonImport(kind){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="application/json,.json";
+  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=async()=>{
+      try{
+        const d=JSON.parse(rd.result); const id=writeOwner();
+        if(kind==="hours"){ if(!d.hours) throw 0; DB.shophours[id]=normHours(d.hours); }
+        else if(kind==="emps"){ if(!Array.isArray(d.employees)) throw 0;
+          if(!confirm(`Εισαγωγή ${d.employees.length} υπαλλήλων; Θα αντικαταστήσουν τους τρέχοντες αυτού του χρήστη.`)) return;
+          DB.employees=DB.employees.filter(e=>e.owner!==id).concat(d.employees.map(e=>Object.assign({},e,{id:e.id||uid(),owner:id})));
+        }
+        else if(kind==="shifts"){ if(!Array.isArray(d.shifts)) throw 0; DB.shifts[id]=d.shifts.map(s=>Object.assign({},s,{id:s.id||("sh_"+uid())})); }
+        else if(kind==="needs"){ if(!d.needs) throw 0; if(Array.isArray(d.shifts)) DB.shifts[id]=d.shifts.map(s=>Object.assign({},s,{id:s.id||("sh_"+uid())})); DB.needs[id]=d.needs; }
+        await persist(); toast("Η εισαγωγή ολοκληρώθηκε.");
+      }catch(e){ toast("Μη έγκυρο αρχείο JSON για αυτή την ενότητα.",true); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+const jsonButtons=kind=>`<div class="toolbar" style="gap:6px"><button class="btn ghost sm" data-jexp="${kind}" title="Λήψη σε αρχείο JSON">⬇ JSON</button><button class="btn ghost sm" data-jimp="${kind}" title="Ανέβασμα από αρχείο JSON">⬆ JSON</button></div>`;
 
 /* ---------- 2. ΓΡΑΦΕΑΣ XLSX (ZIP + OOXML, χωρίς βιβλιοθήκες) ---------- */
 const CRC=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[i]=c>>>0;}return t;})();
@@ -1010,7 +1045,8 @@ async function shiftCanvasByEmp(){
   const {result,shifts}=buildSchedule();
   const rng=shiftWeekRange();
   const headers=["Βάρδια"].concat(DAYS.map((d,i)=>{ const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i); return `${DAY_GR[d].slice(0,3)}\n${dt.getDate()}/${dt.getMonth()+1}`; }));
-  const rows=shifts.map(sh=>[`${sh.name}\n${shiftLabel(sh)}`].concat(DAYS.map(d=>{
+  const needOf=sh=>{ let mx=0; DAYS.forEach(d=>{ const r=(result[d]||[]).find(x=>x.shift.id===sh.id); if(r&&r.need>mx)mx=r.need; }); return mx; };
+  const rows=shifts.map(sh=>[`${sh.name} [${needOf(sh)}]\n${shiftLabel(sh)}`].concat(DAYS.map(d=>{
     const r=(result[d]||[]).find(x=>x.shift.id===sh.id);
     if(!r||!r.need) return "—";
     return (r.closed?"Κλειστά":r.emps.map(a=>empName(a.empId)+" "+a.eff.label).join("\n")+(r.missing?`\n(λείπουν ${r.missing})`:""));
@@ -1021,7 +1057,8 @@ async function shiftCanvasByEmp(){
 async function shiftCanvasByDay(){
   const {result,shifts}=buildSchedule();
   const rng=shiftWeekRange();
-  const headers=["Ημέρα"].concat(shifts.map(sh=>`${sh.name}\n${shiftLabel(sh)}`));
+  const needOf=sh=>{ let mx=0; DAYS.forEach(d=>{ const r=(result[d]||[]).find(x=>x.shift.id===sh.id); if(r&&r.need>mx)mx=r.need; }); return mx; };
+  const headers=["Ημέρα"].concat(shifts.map(sh=>`${sh.name} [${needOf(sh)}]\n${shiftLabel(sh)}`));
   const rows=DAYS.map((d,i)=>{
     const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i);
     return [`${DAY_GR[d]}\n${dt.getDate()}/${dt.getMonth()+1}`].concat(shifts.map(sh=>{
@@ -2296,7 +2333,7 @@ const DAY_GR={mon:"Δευτέρα",tue:"Τρίτη",wed:"Τετάρτη",thu:"Π
 function renderHours(){
   const box=$("#hoursBox"); if(!box) return;
   const h=myHours();
-  box.innerHTML=`<table><thead><tr><th>Ημέρα</th><th>Κλειστά</th><th>Α΄ διάστημα</th><th>Β΄ διάστημα <span class="muted">(προαιρετικό)</span></th></tr></thead><tbody>${
+  box.innerHTML=`<div class="row-end" style="margin-bottom:8px">${jsonButtons("hours")}</div><table><thead><tr><th>Ημέρα</th><th>Κλειστά</th><th>Α΄ διάστημα</th><th>Β΄ διάστημα <span class="muted">(προαιρετικό)</span></th></tr></thead><tbody>${
     DAYS.map(d=>`<tr>
       <td class="name">${DAY_GR[d]}</td>
       <td><input type="checkbox" data-hclosed="${d}" ${h[d].closed?"checked":""} style="width:auto"></td>
@@ -2329,7 +2366,7 @@ function renderEmp(){
   const list=mineEmp();
   if(!list.length){ box.innerHTML='<div class="empty"><strong>Κανένας υπάλληλος</strong>Προσθέστε υπαλλήλους για να παραχθεί πρόγραμμα εργασίας.</div>'; return; }
   const MODES=[["yes","Διαθέσιμος (όλη μέρα)"],["no","Μη διαθέσιμος"],["morning","Πρωινές ώρες (08–16)"],["noon","Μεσημεριανές (10–18)"],["evening","Απογευματινές/βραδινές (18–04)"],["only","Μόνο ώρες που μπορεί"],["not","Μόνο ώρες που ΔΕΝ μπορεί"]];
-  box.innerHTML=list.map(e=>`
+  box.innerHTML=`<div class="row-end" style="margin-bottom:10px">${jsonButtons("emps")}</div>`+list.map(e=>`
     <div class="panel" style="margin-bottom:12px;box-shadow:none">
       <div class="panel-h" style="padding:10px 14px">
         <h2 style="font-size:14px">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}</h2>
@@ -2368,9 +2405,15 @@ function renderEmp(){
   $$('[data-empmode]').forEach(sel=>sel.onchange=async()=>{
     const [id,d]=sel.dataset.empmode.split(":"); const e=DB.employees.find(x=>x.id===id); if(!e) return;
     if(!e.avail[d]) e.avail[d]={mode:"yes"};
+    const prev=e.avail[d].mode;
     e.avail[d].mode=sel.value;
-    const pf=PRESET_HOURS[sel.value];   // auto-fill ωρών για presets
-    if(pf){ if(!e.avail[d].from) e.avail[d].from=pf[0]; if(!e.avail[d].to) e.avail[d].to=pf[1]; }
+    const pf=PRESET_HOURS[sel.value];
+    if(pf){
+      // Αλλαγή σε preset: αν οι προηγούμενες ώρες ήταν από άλλο preset ή κενές, βάλε τις νέες preset ώρες
+      const prevWasPreset=!!PRESET_HOURS[prev];
+      if(prevWasPreset || !e.avail[d].from || !e.avail[d].to){ e.avail[d].from=pf[0]; e.avail[d].to=pf[1]; }
+      e.avail[d].from2=""; e.avail[d].to2="";
+    }
     await persist(); renderEmp();
   });
   saveTime("empfrom","from"); saveTime("empto","to"); saveTime("empfrom2","from2"); saveTime("empto2","to2");
@@ -2469,7 +2512,7 @@ function intersectGroups(groups){
 /* Πραγματική βάρδια = βάρδια ∩ ωράριο μαγαζιού ∩ διαθεσιμότητα.
    maxH = διαθέσιμο υπόλοιπο ωρών· αν η βάρδια δεν χωράει και ο υπάλληλος είναι σπαστός, κόβεται. */
 function trimTo(inter,maxMin){ let b=maxMin; const out=[]; for(const [f,t] of inter){ if(b<=0)break; const take=Math.min(t-f,b); out.push([f,f+take]); b-=take; } return out; }
-function effectiveShift(e,day,sh,hrs,maxH){
+function effectiveShift(e,day,sh,hrs,maxH,allowShort){
   const d=hrs[day]; if(!d||d.closed) return null;
   const store=storeSegsExt(d), av=availSegsExt(e,day);
   if(!store.length||!av.length) return null;
@@ -2477,16 +2520,20 @@ function effectiveShift(e,day,sh,hrs,maxH){
   if(!inter.length) return null;
   inter.sort((a,b)=>a[0]-b[0]);
   let mins=inter.reduce((s,[f,t])=>s+(t-f),0);
+  const fullMins=Math.min(480, shiftStoreHours(sh,d)*60);            // πλήρης βάρδια εντός μαγαζιού
   if(mins>480){ inter=trimTo(inter,480); mins=480; }                 // μέγιστο 8h/ημέρα
   if(maxH!=null && mins>maxH*60+0.5){                                // δεν χωράει στον στόχο
-    if(!e.split) return null;                                        // χωρίς σπαστό → δεν μπαίνει
-    const mm=Math.floor(maxH*60); if(mm<60) return null;             // κάτω από 1h δεν αξίζει
+    const mm=Math.floor(maxH*60);
+    if(!e.split && !allowShort && mm<mins){ return null; }           // χωρίς σπαστό → όλη ή τίποτα
+    if(mm<60) return null;
     inter=trimTo(inter,mm); mins=mm;
   }
   const hours=Math.round(mins/6)/10;
-  if(hours<MIN_SHIFT_H && !e.split) return null;                     // ελάχιστο 4h εκτός σπαστού
+  if(hours<MIN_SHIFT_H && !e.split && !allowShort) return null;      // ελάχιστο 4h εκτός σπαστού/συμπλήρωσης
+  if(hours<60/60 && allowShort) { if(mins<60) return null; }
   if(hours<=0) return null;
-  return {segs:inter,hours,label:inter.map(([f,t])=>`${toHHMM(f%1440)}–${toHHMM(((t-1)%1440)+1)}`).join(", ")};
+  const partial = mins < fullMins-0.5;                               // δεν καλύπτει όλη τη βάρδια → κίτρινο
+  return {segs:inter,hours,partial,label:inter.map(([f,t])=>`${toHHMM(f%1440)}–${toHHMM(((t-1)%1440)+1)}`).join(", ")};
 }
 function shiftData(){
   const emps=mineEmp(), shifts=myShifts(), needs=myNeeds();
@@ -2521,14 +2568,14 @@ function buildSchedule(){
       for(let i=0;i<need;i++) ranked.push({rec,rank:i});   // rank 0 = το 1ο άτομο κάθε βάρδιας
     });
   });
-  const tryFill=rec=>{
+  const tryFill=(rec,allowShort)=>{
     const day=rec.day, sh=rec.shift;
     const opts=emps.map(e=>{
       const key=e.id+":"+day, load=dayLoad[key]||{mins:0,segs:[]};
       if(load.segs.length && !e.split) return null;
       const remaining = e.weekly>0 ? e.weekly-hours[e.id] : null;
       if(remaining!=null && remaining<=0.01) return null;
-      const eff=effectiveShift(e,day,sh,hrs,remaining); if(!eff) return null;
+      const eff=effectiveShift(e,day,sh,hrs,remaining,allowShort); if(!eff) return null;
       if(load.segs.some(([s,en])=>eff.segs.some(([s2,e2])=>Math.max(s,s2)<Math.min(en,e2)))) return null;
       if(load.mins+eff.hours*60>480.5) return null;
       return {e,eff,load,key};
@@ -2540,39 +2587,52 @@ function buildSchedule(){
       return cnt[a.e.id]-cnt[b.e.id];
     });
     const p=opts[0];
-    rec.emps.push({empId:p.e.id,eff:p.eff}); rec.missing--;
+    rec.emps.push({empId:p.e.id,eff:p.eff,partial:p.eff.partial}); rec.missing--;
     dayLoad[p.key]={mins:p.load.mins+p.eff.hours*60,segs:p.load.segs.concat(p.eff.segs)};
     hours[p.e.id]+=p.eff.hours; cnt[p.e.id]++;
     return true;
   };
-  /* ΠΡΟΤΕΡΑΙΟΤΗΤΑ ΚΑΛΥΨΗΣ, ΔΙΚΑΙΑ ΑΝΑ ΗΜΕΡΑ:
-     σε κάθε γύρο, κάθε ημέρα καλύπτει το πολύ μία ακόμη θέση (τη μικρότερου rank).
-     Έτσι πρώτα εξασφαλίζεται 1 άτομο σε κάθε βάρδια όλων των ημερών, και το τυχόν
-     έλλειμμα απλώνεται σε όλη την εβδομάδα αντί να αδειάζει ολόκληρες μέρες. */
   const slotsOfDay=day=>ranked.filter(x=>x.rec.day===day&&x.rec.missing>0).sort((a,b)=>a.rank-b.rank).map(x=>x.rec);
+  /* Φάση 1: κανονική κάλυψη (πλήρεις ή ≥4h βάρδιες), δίκαια ανά ημέρα */
   let progress=true, guard=0;
   while(progress && guard++<800){
     progress=false;
-    DAYS.forEach(day=>{
-      const ds=slotsOfDay(day);
-      for(const rec of ds){ if(tryFill(rec)){ progress=true; break; } }  // 1 ανά ημέρα ανά γύρο
-    });
+    DAYS.forEach(day=>{ for(const rec of slotsOfDay(day)){ if(tryFill(rec,false)){ progress=true; break; } } });
   }
-  /* Σύσταση προσωπικού: πόσες ώρες μένουν ακάλυπτες & πόσους υπαλλήλους χρειάζεται */
-  let deficitH=0, missingSlots=0;
+  /* Φάση 2: συμπλήρωση ακάλυπτων με μερικές ώρες (κίτρινο) —
+     αν κάποιος έχει ακόμη διαθέσιμες ώρες και έστω μερική επικάλυψη με ακάλυπτη βάρδια,
+     τον βάζουμε (έστω για 1–2 ώρες) αντί να μείνει η θέση εντελώς κενή. */
+  progress=true; guard=0;
+  while(progress && guard++<800){
+    progress=false;
+    DAYS.forEach(day=>{ for(const rec of slotsOfDay(day)){ if(tryFill(rec,true)){ progress=true; break; } } });
+  }
+  /* Σύσταση προσωπικού + ποιοι έχουν ακόμη διαθέσιμες ώρες */
+  let deficitH=0;
   DAYS.forEach(day=>result[day].forEach(r=>{
     if(r.missing>0 && !r.closed){
       warns.push(`${DAY_GR[day]} · ${r.shift.name}: λείπουν ${r.missing} άτομα.`);
       deficitH += r.missing * shiftStoreHours(r.shift,hrs[day]);
-      missingSlots += r.missing;
     }
   }));
-  const advice = deficitH>0 ? {
-    deficitH: Math.round(deficitH*10)/10,
-    full: Math.ceil(deficitH/40),
-    part: Math.ceil(deficitH/20)
-  } : null;
-  return {result,hours,emps,shifts,warns,advice,deficitH:Math.round(deficitH*10)/10};
+  const advice = deficitH>0 ? { deficitH:Math.round(deficitH*10)/10, full:Math.ceil(deficitH/40), part:Math.ceil(deficitH/20) } : null;
+  /* Για κάθε υπάλληλο κάτω από στόχο: ποιες ημέρες/βάρδιες είναι ακόμη διαθέσιμος (και ακάλυπτες) */
+  const freeInfo={};
+  emps.forEach(e=>{
+    const remaining = e.weekly>0 ? Math.round((e.weekly-hours[e.id])*10)/10 : 0;
+    if(!(remaining>0.4)) return;
+    const spots=[];
+    DAYS.forEach(day=>{ if(hrs[day]&&hrs[day].closed) return;
+      shifts.forEach(sh=>{
+        const rec=result[day].find(r=>r.shift.id===sh.id);
+        if(!rec || rec.need<=0) return;
+        const ef=effectiveShift(e,day,sh,hrs,remaining,true);
+        if(ef && rec.missing>0) spots.push(`${DAY_GR[day]} ${sh.name} (${ef.label})`);
+      });
+    });
+    freeInfo[e.id]={remaining,spots:spots.slice(0,6)};
+  });
+  return {result,hours,emps,shifts,warns,advice,deficitH:Math.round(deficitH*10)/10,freeInfo};
 }
 const empName=id=>{ const {emps}=shiftData(); const e=emps.find(x=>x.id===id); return e?e.name:""; };
 
@@ -2580,7 +2640,7 @@ const empName=id=>{ const {emps}=shiftData(); const e=emps.find(x=>x.id===id); r
 function renderShiftDef(){
   const box=$("#shiftDefBox"); if(!box) return;
   const shifts=myShifts();
-  box.innerHTML=`<table><thead><tr><th>Όνομα</th><th>Από</th><th>Έως</th><th>Διάρκεια</th><th></th></tr></thead><tbody>${
+  box.innerHTML=`<div class="row-end" style="margin-bottom:8px">${jsonButtons("shifts")}</div><table><thead><tr><th>Όνομα</th><th>Από</th><th>Έως</th><th>Διάρκεια</th><th></th></tr></thead><tbody>${
     shifts.map(sh=>`<tr>
       <td><input data-shname="${sh.id}" value="${esc(sh.name)}" style="width:130px"></td>
       <td>${timeInput("shfrom",sh.id,sh.from)}</td>
@@ -2603,7 +2663,7 @@ function renderNeeds(){
   const shifts=myShifts(), needs=myNeeds();
   const totalPerDay=d=>shifts.reduce((s,sh)=>s+((needs[d]&&needs[d][sh.id])||0),0);
   const peak=Math.max(1,...DAYS.map(totalPerDay));
-  box.innerHTML=`<table><thead><tr><th>Ημέρα</th>${shifts.map(sh=>`<th style="text-align:center">${esc(sh.name)}<div class="muted" style="font-weight:400;font-size:10.5px">${shiftLabel(sh)}</div></th>`).join("")}<th style="text-align:center">Σύνολο</th></tr></thead><tbody>${
+  box.innerHTML=`<div class="row-end" style="margin-bottom:8px">${jsonButtons("needs")}</div><table><thead><tr><th>Ημέρα</th>${shifts.map(sh=>`<th style="text-align:center">${esc(sh.name)}<div class="muted" style="font-weight:400;font-size:10.5px">${shiftLabel(sh)}</div></th>`).join("")}<th style="text-align:center">Σύνολο</th></tr></thead><tbody>${
     DAYS.map(d=>{
       const tot=totalPerDay(d), isPeak=tot>=peak&&tot>0;
       return `<tr${isPeak?' style="background:#FBF4E6"':''}>
@@ -2627,7 +2687,7 @@ function renderShift(){
   const {emps,shifts}=shiftData();
   const rng=shiftWeekRange();
   if(!emps.length){ box.innerHTML='<div class="empty"><strong>Χωρίς πρόγραμμα</strong>Προσθέστε υπαλλήλους, βάρδιες και ανάγκες, μετά πατήστε «Αυτόματη δημιουργία».</div>'; return; }
-  const {result,hours,warns,advice}=buildSchedule();
+  const {result,hours,warns,advice,freeInfo}=buildSchedule();
   const nav=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2)">
       <button class="btn ghost sm" id="shPrev">◀</button>
       <b style="font-family:'Noto Serif',serif">Εβδομάδα: ${rng.label}</b>
@@ -2639,16 +2699,26 @@ function renderShift(){
     if(!rows.length) return `<tr><td class="name">${DAY_GR[d]}</td><td colspan="2" class="muted">— καμία βάρδια —</td></tr>`;
     return rows.map((r,i)=>`<tr>
       ${i===0?`<td class="name" rowspan="${rows.length}" style="vertical-align:top">${DAY_GR[d]}</td>`:""}
-      <td style="white-space:nowrap"><b>${esc(r.shift.name)}</b> <span class="muted mono">${shiftLabel(r.shift)}</span></td>
-      <td>${r.closed?'<span class="muted">Κλειστά</span>':r.emps.map(a=>`<span class="pill p-done" style="margin:1px 3px 1px 0;display:inline-block">${esc(empName(a.empId))} <span style="opacity:.75">${a.eff.label}</span></span>`).join("")}${r.missing&&!r.closed?`<span class="pill p-canc" title="Χρειάζεστε περισσότερο διαθέσιμο προσωπικό για αυτή τη βάρδια">⚠ Λείπουν ${r.missing} άτομα</span>`:""}</td>
+      <td style="white-space:nowrap"><b>${esc(r.shift.name)}</b> <span class="pill p-past" style="font-size:10px">${r.need} ${r.need===1?"άτομο":"άτομα"}</span> <span class="muted mono">${shiftLabel(r.shift)}</span></td>
+      <td>${r.closed?'<span class="muted">Κλειστά</span>':r.emps.map(a=>`<span class="pill ${a.partial?"p-part":"p-done"}" style="margin:1px 3px 1px 0;display:inline-block" title="${a.partial?"Μερική κάλυψη — διαφορετικό ωράριο από τη βάρδια":"Πλήρης βάρδια"}">${esc(empName(a.empId))} <span style="opacity:.75">${a.eff.label}</span></span>`).join("")}${r.missing&&!r.closed?`<span class="pill p-canc" title="Χρειάζεστε περισσότερο διαθέσιμο προσωπικό για αυτή τη βάρδια">⚠ Λείπ${r.missing===1?"ει":"ουν"} ${r.missing} ${r.missing===1?"άτομο":"άτομα"}</span>`:""}</td>
     </tr>`).join("");
   }).join("");
-  const hoursRows=emps.map(e=>{ const h=Math.round((hours[e.id]||0)*10)/10; const over=e.weekly>0&&h>e.weekly+0.01; return `<tr><td class="name">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}${e.split?' <span class="pill p-sched" style="font-size:10px">σπαστό</span>':''}</td><td class="mono" style="text-align:right;color:${over?"#A83A2C":"inherit"};font-weight:600">${h}h${e.weekly?` / ${e.weekly}h`:""}</td></tr>`; }).join("");
+  const hoursRows=emps.map(e=>{
+    const h=Math.round((hours[e.id]||0)*10)/10; const over=e.weekly>0&&h>e.weekly+0.01;
+    const fi=freeInfo&&freeInfo[e.id];
+    const info = fi ? ` <span class="infodot" title="Απομένουν ${fi.remaining}h. ${fi.spots.length?"Είναι διαθέσιμος και ακάλυπτες βάρδιες υπάρχουν σε: "+fi.spots.join(" · ")+". Επικοινωνήστε μαζί του για να καλυφθούν.":"Δεν υπάρχουν αυτή τη στιγμή ακάλυπτες βάρδιες μέσα στη διαθεσιμότητά του."}">&#9432;</span>` : "";
+    return `<tr><td class="name">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}${e.split?' <span class="pill p-sched" style="font-size:10px">σπαστό</span>':''}</td><td class="mono" style="text-align:right;color:${over?"#A83A2C":"inherit"};font-weight:600">${h}h${e.weekly?` / ${e.weekly}h`:""}${info}</td></tr>`;
+  }).join("");
   const adviceHtml = advice ? `<div class="flag staff" style="margin:10px 14px"><span>👥</span><span><b>Σύσταση προσωπικού.</b> Μένουν <b>${advice.deficitH} ώρες/εβδομάδα</b> ακάλυπτες. Για να βγαίνει άνετα το πρόγραμμα χρειάζεστε επιπλέον, κατά προσέγγιση, <b>${advice.full} ${advice.full===1?"υπάλληλο":"υπαλλήλους"} πλήρους απασχόλησης</b> (~40 ώρες/εβδ.) <b>ή ${advice.part} ${advice.part===1?"υπάλληλο":"υπαλλήλους"} μερικής απασχόλησης</b> (~20 ώρες/εβδ.).</span></div>` : "";
   box.innerHTML=nav+
     (warns.length?`<div class="flag warn" style="margin:10px 14px"><span>⚠</span><span><b>Ακάλυπτες βάρδιες</b> (χρειάζεστε περισσότερο διαθέσιμο προσωπικό εκεί):<br>${warns.map(esc).join("<br>")}</span></div>`:'<div class="flag match" style="margin:10px 14px"><span>✓</span><span>Όλες οι βάρδιες καλύπτονται, χωρίς υπέρβαση ωρών.</span></div>')+
     adviceHtml+
     `<table><thead><tr><th>Ημέρα</th><th>Βάρδια</th><th>Προσωπικό</th></tr></thead><tbody>${body}</tbody></table>
+    <div style="padding:8px 14px;font-size:11.5px;color:#5B6D74;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span><span class="pill p-done" style="font-size:10px">Πράσινο</span> πλήρης βάρδια — ίδιο ωράριο με τη βάρδια</span>
+      <span><span class="pill p-part" style="font-size:10px">Κίτρινο</span> μέσα στη βάρδια αλλά με διαφορετικό/μερικό ωράριο</span>
+      <span><span class="pill p-canc" style="font-size:10px">Κόκκινο</span> λείπει άτομο</span>
+    </div>
     <div class="sec-t" style="padding:0 14px;margin-top:14px">Σύνολο ωρών ανά υπάλληλο (εβδομάδα)</div>
     <table style="margin-top:4px"><tbody>${hoursRows}</tbody></table>`;
   $("#shPrev").onclick=()=>{ const s=shiftWeekStart(); shiftWeek=new Date(s.getFullYear(),s.getMonth(),s.getDate()-7); renderShift(); };
@@ -3239,7 +3309,7 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-shdel],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-jexp],button[data-jimp],button[data-shdel],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
@@ -3294,6 +3364,8 @@ function bind(){
       return;
     }
     if(d.reqcv){ if(isAdmin()) sendCV(d.reqcv); return; }
+    if(d.jexp){ jsonExport(d.jexp); return; }
+    if(d.jimp){ jsonImport(d.jimp); return; }
     if(d.shdel){
       const list=myShifts(); const sh=list.find(x=>x.id===d.shdel);
       if(sh&&confirm(`Διαγραφή βάρδιας «${sh.name}»;`)){ const id=writeOwner(); DB.shifts[id]=list.filter(x=>x.id!==d.shdel); Object.keys(DB.needs[id]||{}).forEach(dd=>{ if(DB.needs[id][dd]) delete DB.needs[id][dd][d.shdel]; }); await persist(); renderShiftDef(); renderNeeds(); renderShift(); }
