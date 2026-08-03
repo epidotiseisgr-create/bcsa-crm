@@ -33,6 +33,12 @@
   #bellChip{position:relative;font-size:15px;padding:6px 9px}
   .bellbadge{display:none;position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:9px;background:#D64533;color:#fff;font-size:10px;font-weight:700;line-height:17px;text-align:center;padding:0 4px}
   .bellbadge.on{display:block}
+  .cvrow{display:flex;gap:8px;align-items:center;padding:6px 8px;margin-top:4px;border:1px solid var(--line-2);border-radius:4px;background:#FCFDFC}
+  .cvrow.cv-chosen{border-color:var(--sea,#1E6E6A);background:#EAF5F3}
+  .cvrow-sm{display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12.5px}
+  .cvrow-sm.cv-chosen{font-weight:600}
+  @keyframes blinkbtn{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(176,132,47,.5)}50%{opacity:.55;box-shadow:0 0 0 4px rgba(176,132,47,.25)}}
+  .btn.blink{animation:blinkbtn 1s ease-in-out infinite}
   .head-meta strong{display:block;color:#EFF1EF;font-size:13px;font-weight:600}
   .chip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;padding:3px 9px;border:1px solid #2E4A54;border-radius:20px;font-size:11px;cursor:pointer;background:none;color:#9DB3BB;font-family:inherit}
   .chip:hover{border-color:var(--brass);color:#EFF1EF}
@@ -556,7 +562,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.5 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.6 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -2108,13 +2114,22 @@ function renderMyReq(){
   const box=$("#myReqList"); if(!box) return;
   const rows=mineReq();
   box.innerHTML = rows.length ? `<div class="sec-t">Τα αιτήματά μου</div>`+rows.map(r=>`
-    <div class="appt" style="margin-bottom:6px;border-left-color:var(--brass)">
+    <div class="appt" style="margin-bottom:6px;border-left-color:var(--brass);display:block">
       <div><b>${esc(r.position)}</b> <span class="pill p-sched">${EMP_TYPE[r.type]||r.type}</span> <span class="pill ${REQ_PILL[r.status]||"p-past"}">${REQ_ST[r.status]||r.status}</span>
+        ${r.status==="pending"||r.status==="rejected"?`<button class="btn danger sm" data-reqdel="${r.id}" style="float:right">✕</button>`:""}
         ${r.note?`<div class="t">${esc(r.note)}</div>`:""}
         ${r.status==="rejected"&&r.reason?`<div class="t" style="color:#A83A2C">Αιτιολογία: ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}
-        ${(r.cvs&&r.cvs.length)?`<div class="t" style="margin-top:4px"><b>Βιογραφικά που λάβατε:</b>${r.cvs.map(cv=>`<div style="margin-top:3px">📎 <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0">${esc(cv.link)}</a>${cv.note?` <span class="muted">— ${esc(cv.note)}</span>`:""}</div>`).join("")}</div>`:""}
-        <div class="muted">${stamp(r.ts)}</div></div>
-      <div class="appt-actions">${r.status==="pending"||r.status==="rejected"?`<button class="btn danger sm" data-reqdel="${r.id}">✕</button>`:""}</div>
+        ${(r.cvs&&r.cvs.length)?`<div class="t" style="margin-top:8px"><b>Βιογραφικά που λάβατε — επιλέξτε ενδιαφέρον:</b>
+          ${r.cvs.map(cv=>`<div class="cvrow ${cv.chosen?"cv-chosen":""}">
+            <div style="flex:1;min-width:0">📎 <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0">${esc(cv.link)}</a>${cv.note?`<div class="muted" style="font-size:12px">${esc(cv.note)}</div>`:""}</div>
+            <div style="white-space:nowrap;display:flex;gap:5px;align-items:center">
+              <button class="btn ${cv.interview?"brass":"ghost"} sm" data-cvint="${r.id}:${cv.id}" title="Για συνέντευξη">${cv.interview?"★ Συνέντευξη":"☆ Συνέντευξη"}</button>
+              <button class="btn ${cv.chosen?"brass":"ghost"} sm" data-cvpick="${r.id}:${cv.id}" title="Επικρατέστερο">${cv.chosen?"✓ Επικρατέστερο":"Επιλογή"}</button>
+            </div>
+          </div>`).join("")}
+          ${r.finalPicked?`<div class="t" style="color:#1E6E6A;margin-top:4px">✓ Επιλέξατε επικρατέστερο βιογραφικό. Ο διαχειριστής ενημερώθηκε για ολοκλήρωση.</div>`:'<div class="muted" style="margin-top:4px;font-size:12px">Σημειώστε ★ όσα θέλετε για συνέντευξη· πατήστε «Επιλογή» στο επικρατέστερο.</div>'}
+        </div>`:(r.status==="accepted"?'<div class="muted" style="margin-top:6px">Σε αναμονή αποστολής βιογραφικών από τον διαχειριστή.</div>':"")}
+        <div class="muted" style="margin-top:5px">${stamp(r.ts)}</div></div>
     </div>`).join("") : "";
 }
 
@@ -2123,19 +2138,28 @@ function renderReqAdmin(){
   const wrap=$("#admReqPanel"), box=$("#reqAdmin"); if(!box) return;
   if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
   if(!DB.staffReq.length){ box.innerHTML='<div class="empty"><strong>Κανένα αίτημα</strong>Όταν ένας χρήστης ζητήσει προσωπικό, θα εμφανιστεί εδώ.</div>'; return; }
-  box.innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Επιχείρηση / Χρήστης</th><th>Θέση</th><th>Τύπος</th><th>Σημειώσεις</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
-    DB.staffReq.slice().sort((a,b)=>b.ts-a.ts).map(r=>`<tr>
+  box.innerHTML=`<table><thead><tr><th>Ημ/νία</th><th>Επιχείρηση / Χρήστης</th><th>Θέση</th><th>Τύπος</th><th>Βιογραφικά & επιλογές</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
+    DB.staffReq.slice().sort((a,b)=>b.ts-a.ts).map(r=>{
+      const cvs=r.cvs||[];
+      const cvHtml = cvs.length ? cvs.map(cv=>`<div class="cvrow-sm ${cv.chosen?"cv-chosen":""}">
+          <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">📎 ${esc(cv.link)}</a>
+          ${cv.interview?'<span class="pill p-sched" title="Επιλέχθηκε για συνέντευξη">★ συνέντ.</span>':""}
+          ${cv.chosen?'<span class="pill p-done" title="Επικρατέστερο">✓ επικρατ.</span>':""}
+        </div>`).join("") : '<span class="muted">— κανένα ακόμη —</span>';
+      const finBlink = r.finalPicked && r.status==="accepted";
+      return `<tr>
       <td class="mono" style="white-space:nowrap">${grDate(iso(new Date(r.ts)))}<br><span class="muted">${hhmm(r.ts)}</span></td>
       <td>${r.biz?`<b>${esc(r.biz)}</b><br>`:""}<span class="pill p-sched">${esc(r.ownerLabel||ownerName(r.owner))}</span></td>
-      <td class="name">${esc(r.position)}</td>
+      <td class="name">${esc(r.position)}${r.note?`<div class="muted" style="font-weight:400;font-size:12px">${esc(r.note)}</div>`:""}</td>
       <td>${EMP_TYPE[r.type]||r.type}</td>
-      <td class="desc">${r.note?esc(r.note):'<span class="muted">—</span>'}${r.status==="rejected"&&r.reason?`<div style="color:#A83A2C;font-size:12px">✕ ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}</td>
+      <td style="min-width:220px">${cvHtml}${r.status==="rejected"&&r.reason?`<div style="color:#A83A2C;font-size:12px">✕ ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}${finBlink?'<div style="color:#1E6E6A;font-size:12px;margin-top:3px">Ο χρήστης επέλεξε επικρατέστερο — έτοιμο για ολοκλήρωση.</div>':""}</td>
       <td><span class="pill ${REQ_PILL[r.status]||"p-past"}">${REQ_ST[r.status]||r.status}</span></td>
       <td style="text-align:right;white-space:nowrap">
         ${r.status==="pending"?`<button class="btn ghost sm" data-reqok="${r.id}">✓ Αποδοχή</button><button class="btn danger sm" data-reqno="${r.id}">Απόρριψη</button>`:""}
-        ${r.status==="accepted"?`<button class="btn ghost sm" data-reqcv="${r.id}">Αποστολή βιογραφικών</button><button class="btn ghost sm" data-reqfin="${r.id}">Ολοκλήρωση</button>`:""}
+        ${r.status==="accepted"?`<button class="btn ghost sm" data-reqcv="${r.id}">Αποστολή βιογραφικών</button><button class="btn ${finBlink?"brass blink":"ghost"} sm" data-reqfin="${r.id}">Ολοκλήρωση</button>`:""}
         <button class="btn danger sm" data-reqdel="${r.id}">✕</button>
-      </td></tr>`).join("")}</tbody></table>`;
+      </td></tr>`;
+    }).join("")}</tbody></table>`;
 }
 async function acceptReq(id){
   const r=DB.staffReq.find(x=>x.id===id); if(!r) return;
@@ -2167,8 +2191,10 @@ function rejectReq(id){
 }
 async function finishReq(id){
   const r=DB.staffReq.find(x=>x.id===id); if(!r) return;
-  r.status="done";
-  notify(r.owner,`Το αίτημά σας για «${r.position}» ολοκληρώθηκε.`);
+  const chosen=(r.cvs||[]).find(c=>c.chosen);
+  r.status="done"; r.finalPicked=false;
+  notify(r.owner,`Το αίτημά σας για «${r.position}» ολοκληρώθηκε.${chosen?` Επικρατέστερο: ${chosen.link}`:""}`);
+  logIt(`Ολοκλήρωση αιτήματος «${r.position}»${chosen?` — επιλογή: ${chosen.link}`:""}`,"sys","");
   await persist(); toast("Το αίτημα ολοκληρώθηκε.");
 }
 /* Αποστολή link βιογραφικών προς τον χρήστη που ζήτησε */
@@ -2191,7 +2217,7 @@ function sendCV(reqId){
     const link=$("#cvLink").value.trim(), note=$("#cvNote").value.trim();
     if(link){
       if(!Array.isArray(r.cvs)) r.cvs=[];
-      r.cvs.push({link,note,ts:Date.now()});
+      r.cvs.push({id:uid(),link,note,ts:Date.now(),interview:false,chosen:false});
       notify(r.owner,`Βιογραφικά για «${r.position}»: ${link}${note?" — "+note:""}`);
     }
     r.status="accepted"; logIt(`Αποστολή βιογραφικών για «${r.position}» → ${r.ownerLabel}`,"sys","");
@@ -2906,10 +2932,34 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
+    if(d.cvint){
+      const [rid,cid]=d.cvint.split(":"); const r=DB.staffReq.find(x=>x.id===rid);
+      const cv=r&&(r.cvs||[]).find(c=>c.id===cid);
+      if(cv){ cv.interview=!cv.interview; await persist(); }
+      return;
+    }
+    if(d.cvpick){
+      const [rid,cid]=d.cvpick.split(":"); const r=DB.staffReq.find(x=>x.id===rid);
+      if(r&&r.cvs){
+        const cv=r.cvs.find(c=>c.id===cid); if(!cv) return;
+        const turningOn=!cv.chosen;
+        r.cvs.forEach(c=>c.chosen=false);
+        cv.chosen=turningOn;
+        r.finalPicked=turningOn;
+        if(turningOn){
+          cv.interview=true;
+          notify(ADMIN_BOX,`Ο χρήστης ${r.ownerLabel||ownerName(r.owner)} επέλεξε επικρατέστερο βιογραφικό για «${r.position}». Έτοιμο για ολοκλήρωση.`);
+          logIt(`Επιλογή επικρατέστερου βιογραφικού για «${r.position}»`,"sys","");
+          toast("Ο διαχειριστής ενημερώθηκε για την επιλογή σας.");
+        }
+        await persist();
+      }
+      return;
+    }
     if(d.reqok){ if(isAdmin()) await acceptReq(d.reqok); return; }
     if(d.reqno){ if(isAdmin()) rejectReq(d.reqno); return; }
     if(d.reqfin){ if(isAdmin()) await finishReq(d.reqfin); return; }
