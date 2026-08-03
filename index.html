@@ -221,6 +221,8 @@
   #gErr .flag{margin:0}
 
   #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,140%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--radius);box-shadow:var(--shadow);font-size:13px;z-index:60;transition:transform .28s ease;max-width:90vw}
+  .pilldel{border:0;background:rgba(0,0,0,.12);color:inherit;border-radius:50%;width:15px;height:15px;font-size:9px;line-height:1;cursor:pointer;margin-left:3px;padding:0;vertical-align:middle}
+  .pilldel:hover{background:#B0392B;color:#fff}
   #scrollNav{position:fixed;right:16px;bottom:20px;display:flex;flex-direction:column;gap:6px;z-index:55}
   #scrollNav button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--paper,#fff);color:var(--ink);box-shadow:var(--shadow);cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:.85;transition:opacity .2s}
   #scrollNav button:hover{opacity:1;background:var(--brass-soft)}
@@ -560,9 +562,23 @@
       </div>
       <div id="shiftBox"></div>
     </div>
+
+    <div class="panel" style="margin-top:22px">
+      <div class="panel-h"><h2>Αναφορά προβλήματος</h2><span class="sub">Στέλνεται στον διαχειριστή</span></div>
+      <div class="panel-b">
+        <p class="muted" style="margin-top:0">Αν κάτι δεν δουλεύει σωστά στο πρόγραμμα ή στο ωράριο (π.χ. βάρδια που δεν βγαίνει όπως περιμένατε), γράψτε το εδώ. Η αναφορά φτάνει στον διαχειριστή για να βελτιωθεί το εργαλείο.</p>
+        <div class="field"><textarea id="rptText" placeholder="Περιγράψτε το πρόβλημα με όσο περισσότερες λεπτομέρειες γίνεται…"></textarea></div>
+        <div class="row-end"><button class="btn brass" id="rptSend">📨 Αποστολή αναφοράς</button></div>
+        <div id="myRptList" style="margin-top:14px"></div>
+      </div>
+    </div>
   </section>
 
   <section class="view" id="v-data">
+    <div class="panel" style="margin-bottom:22px" id="admRptPanel">
+      <div class="panel-h"><h2>Αναφορές προβλημάτων</h2><span class="sub">Από τους χρήστες</span></div>
+      <div class="panel-b"><div id="rptAdmin"></div></div>
+    </div>
     <div class="panel" style="margin-bottom:22px" id="admReqPanel">
       <div class="panel-h"><h2>Αιτήματα εύρεσης προσωπικού</h2><span class="sub">Αναφορές προς διαχειριστή</span></div>
       <div class="panel-b"><div id="reqAdmin"></div></div>
@@ -617,7 +633,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.5 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.6 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1338,6 +1354,8 @@ const norm=d=>{
   if(!o.shifts||typeof o.shifts!=="object") o.shifts={};
   if(!o.needs||typeof o.needs!=="object") o.needs={};
   if(!o.templates||typeof o.templates!=="object") o.templates={};
+  if(!o.manualPlace||typeof o.manualPlace!=="object") o.manualPlace={};
+  if(!Array.isArray(o.reports)) o.reports=[];
   if(!Array.isArray(o.notif)) o.notif=[];
   if(typeof o.appVersion!=="string") o.appVersion="";
   return o;
@@ -2346,6 +2364,40 @@ async function addStaffReq(){
   ["#rq3ety","#rqExp","#rqAmea","#rqInv"].forEach(id=>{ const el=$(id); if(el) el.value="na"; });
   await persist(); toast("Το αίτημα στάλθηκε στον διαχειριστή.");
 }
+/* ---------- ΑΝΑΦΟΡΕΣ ΠΡΟΒΛΗΜΑΤΩΝ ---------- */
+function myReports(){ if(!Array.isArray(DB.reports)) DB.reports=[]; return DB.reports.filter(r=>inScope(r.owner)); }
+async function addReport(){
+  const t=($("#rptText")&&$("#rptText").value.trim())||"";
+  if(!t){ toast("Γράψτε πρώτα την αναφορά.",true); return; }
+  if(!Array.isArray(DB.reports)) DB.reports=[];
+  const owner=writeOwner(), label=ownerName(owner);
+  DB.reports.unshift({id:uid(),owner,ownerLabel:label,text:t,ts:Date.now(),resolved:false});
+  notify(ADMIN_BOX,`Νέα αναφορά προβλήματος από ${label}: «${t.slice(0,60)}${t.length>60?"…":""}»`);
+  if($("#rptText")) $("#rptText").value="";
+  await persist(); renderMyReports(); toast("Η αναφορά στάλθηκε στον διαχειριστή.");
+}
+function renderMyReports(){
+  const box=$("#myRptList"); if(!box) return;
+  const list=(DB.reports||[]).filter(r=>(r.owner||"u_admin")===scopeId());
+  box.innerHTML = list.length ? `<div class="sec-t">Οι αναφορές μου</div>`+list.map(r=>`
+    <div class="appt" style="margin-bottom:6px;border-left-color:${r.resolved?"var(--line)":"var(--brass)"};display:block">
+      <div>${esc(r.text)}</div>
+      <div class="muted" style="margin-top:4px">${stamp(r.ts)} · ${r.resolved?"✓ Επιλύθηκε":"Σε αναμονή"}</div>
+    </div>`).join("") : "";
+}
+function renderReportsAdmin(){
+  const box=$("#rptAdmin"); if(!box) return;
+  const p=$("#admRptPanel"); if(p) p.style.display=isAdmin()?"":"none";
+  if(!isAdmin()) return;
+  const list=(DB.reports||[]).slice().sort((a,b)=>b.ts-a.ts);
+  box.innerHTML = list.length ? list.map(r=>`
+    <div class="appt" style="margin-bottom:8px;border-left-color:${r.resolved?"var(--line)":"var(--brass)"};display:block">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><b>${esc(r.ownerLabel||"—")}</b><div style="margin-top:3px">${esc(r.text)}</div><div class="muted" style="margin-top:4px">${stamp(r.ts)}</div></div>
+        <div class="toolbar" style="gap:5px"><button class="btn ${r.resolved?"ghost":"brass"} sm" data-rptres="${r.id}">${r.resolved?"↩ Επανάνοιγμα":"✓ Επιλύθηκε"}</button><button class="btn danger sm" data-rptdel="${r.id}">✕</button></div>
+      </div>
+    </div>`).join("") : '<div class="empty"><strong>Καμία αναφορά</strong>Εδώ θα εμφανίζονται οι αναφορές προβλημάτων από τους χρήστες.</div>';
+}
 function reqDetails(r){
   const bits=[];
   if(r.hours) bits.push(`Ωράριο: ${esc(r.hours)}`);
@@ -2660,6 +2712,17 @@ function defShifts(){ return [
   {id:"sh_e",name:"Απόγευμα",from:"18:00",to:"02:00"}
 ]; }
 const myShifts=()=>{ const id=writeOwner(); if(!DB.shifts[id]||!DB.shifts[id].length) DB.shifts[id]=defShifts(); return DB.shifts[id]; };
+function myManualPlace(){ const id=writeOwner(); if(!DB.manualPlace) DB.manualPlace={}; if(!Array.isArray(DB.manualPlace[id])) DB.manualPlace[id]=[]; return DB.manualPlace[id]; }
+async function addManualPlace(empId,day,sh){
+  const list=myManualPlace();
+  if(list.some(m=>m.empId===empId&&m.day===day&&m.sh===sh)) { toast("Υπάρχει ήδη αυτή η τοποθέτηση."); return; }
+  list.push({id:"mp_"+uid(),empId,day,sh});
+  await persist(); closeModal(); renderShift(); toast("Η τοποθέτηση προστέθηκε (κίτρινη). Μπορείτε να τη σβήσετε με το ✕ στο πρόγραμμα.");
+}
+async function removeManualPlace(mpId){
+  const list=myManualPlace(); const i=list.findIndex(m=>m.id===mpId); if(i<0) return;
+  list.splice(i,1); await persist(); renderShift();
+}
 const myNeeds=()=>{ const id=writeOwner(); if(!DB.needs[id]) DB.needs[id]={}; return DB.needs[id]; };
 function shiftHours(sh){ let s=toMin(sh.from),e=toMin(sh.to); if(e<=s)e+=1440; return Math.round((e-s)/6)/10; }
 const shiftLabel=sh=>`${sh.from}–${sh.to}`;
@@ -2775,6 +2838,24 @@ function buildSchedule(){
      Μέσα σε κάθε επίπεδο: πρώτα η πιο δύσκολη θέση (λιγότεροι υποψήφιοι),
      με προτεραιότητα στις ημέρες με το μεγαλύτερο σύνολο αναγκών (π.χ. Σάββατο).
      Σε κάθε επίπεδο δοκιμάζουμε πρώτα πλήρεις βάρδιες, μετά μερικές/εμβόλιμες. */
+  /* ΧΕΙΡΟΚΙΝΗΤΕΣ ΤΟΠΟΘΕΤΗΣΕΙΣ (από το «Εφάρμοσε» στο ⓘ): μπαίνουν πρώτες, κίτρινες,
+     μετρούν στις ώρες, και ο αυτόματος χτίζει γύρω τους. Έχουν x για μεμονωμένη διαγραφή. */
+  (myManualPlace()).forEach(mp=>{
+    const rec=recs.find(r=>r.day===mp.day && r.shift.id===mp.sh);
+    if(!rec) return;
+    const e=emps.find(x=>x.id===mp.empId); if(!e) return;
+    if(rec.emps.some(a=>a.empId===e.id)) return;
+    const key=e.id+":"+mp.day, load=dayLoad[key]||{mins:0,segs:[]};
+    if(load.segs.length && !e.split) return;
+    const rem=e.weekly>0?e.weekly-hours[e.id]:null;
+    const ef=effectiveShift(e,mp.day,rec.shift,hrs,rem,true);
+    if(!ef) return;
+    if(load.segs.some(([s,en])=>ef.segs.some(([s2,e2])=>Math.max(s,s2)<Math.min(en,e2)))) return;
+    rec.emps.push({empId:e.id,eff:ef,partial:true,manual:true,mpId:mp.id});
+    rec.missing=Math.max(0,rec.missing-1);
+    dayLoad[key]={mins:load.mins+ef.hours*60,segs:load.segs.concat(ef.segs)};
+    hours[e.id]+=ef.hours; cnt[e.id]++;
+  });
   const maxNeed=Math.max(1,...recs.map(r=>r.need));
   for(let level=1;level<=maxNeed;level++){
     [false,true].forEach(allowShort=>{
@@ -2817,8 +2898,11 @@ function buildSchedule(){
       shifts.forEach(sh=>{
         const rec=result[day].find(r=>r.shift.id===sh.id);
         if(!rec || rec.need<=0 || rec.missing<=0) return;
+        // αν είναι ήδη τοποθετημένος εκείνη τη μέρα (και όχι σπαστός), δεν προτείνεται ξανά
+        const already=result[day].some(rr=>(rr.emps||[]).some(a=>a.empId===e.id));
+        if(already && !e.split) return;
         const ef=effectiveShift(e,day,sh,hrs,remaining,true);
-        if(ef) spots.push(`${DAY_GR[day]} ${sh.name} (${ef.label})`);
+        if(ef) spots.push({day,shId:sh.id,label:`${DAY_GR[day]} ${sh.name} (${ef.label})`});
       });
     });
     freeInfo[e.id]={remaining,spots:spots.slice(0,8)};
@@ -2891,7 +2975,7 @@ function renderShift(){
     return rows.map((r,i)=>`<tr>
       ${i===0?`<td class="name" rowspan="${rows.length}" style="vertical-align:top">${DAY_GR[d]}</td>`:""}
       <td style="white-space:nowrap"><b>${esc(r.shift.name)}</b> <span class="pill p-past" style="font-size:10px">${r.need} ${r.need===1?"άτομο":"άτομα"}</span> <span class="muted mono">${shiftLabel(r.shift)}</span></td>
-      <td>${r.closed?'<span class="muted">Κλειστά</span>':r.emps.map(a=>`<span class="pill ${a.partial?"p-part":"p-done"}" style="margin:1px 3px 1px 0;display:inline-block" title="${a.partial?"Εμβόλιμη — διαφορετικό ωράριο από τη βάρδια":"Πλήρης βάρδια"}">${a.partial?"** ":""}${esc(empName(a.empId))} <span style="opacity:.75">${a.eff.label}</span></span>`).join("")}${r.missing&&!r.closed?`<span class="pill p-canc" title="Χρειάζεστε περισσότερο διαθέσιμο προσωπικό για αυτή τη βάρδια">⚠ Λείπ${r.missing===1?"ει":"ουν"} ${r.missing} ${r.missing===1?"άτομο":"άτομα"}</span>`:""}</td>
+      <td>${r.closed?'<span class="muted">Κλειστά</span>':r.emps.map(a=>`<span class="pill ${a.partial?"p-part":"p-done"}" style="margin:1px 3px 1px 0;display:inline-block" title="${a.manual?"Χειροκίνητη τοποθέτηση — πατήστε ✕ για διαγραφή":(a.partial?"Εμβόλιμη — διαφορετικό ωράριο από τη βάρδια":"Πλήρης βάρδια")}">${a.partial?"** ":""}${esc(empName(a.empId))} <span style="opacity:.75">${a.eff.label}</span>${a.manual?` <button class="pilldel" data-shdelplace="${a.mpId}" title="Διαγραφή αυτής της τοποθέτησης">✕</button>`:""}</span>`).join("")}${r.missing&&!r.closed?`<span class="pill p-canc" title="Χρειάζεστε περισσότερο διαθέσιμο προσωπικό για αυτή τη βάρδια">⚠ Λείπ${r.missing===1?"ει":"ουν"} ${r.missing} ${r.missing===1?"άτομο":"άτομα"}</span>`:""}</td>
     </tr>`).join("");
   }).join("");
   window._freeInfo=freeInfo; window._schedResult=result;
@@ -2937,7 +3021,7 @@ function renderStaffCounts(){
   const n = isAdmin() ? DB.staffReq.filter(r=>r.status!=="done").length : 0;
   const el=$("#nStaff"); if(el) el.textContent=n?String(n):"";
 }
-function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShiftDef(); renderNeeds(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
+function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderReportsAdmin(); renderMyReports(); renderHours(); renderEmp(); renderShiftDef(); renderNeeds(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
 function openClient(id){
@@ -2993,8 +3077,8 @@ function openEmpInfo(id){
     <div class="modal-h"><div><h3>${esc(e.name)}</h3><div class="muted">Απομένουν ${remaining} ώρες μέχρι τον στόχο${e.weekly?` (${e.weekly}h)`:""}</div></div><button class="btn ghost sm" id="eiX">✕</button></div>
     <div class="modal-b">
       ${placed.length?`<div class="flag staff" style="margin:0 0 12px"><span>**</span><span><b>Εμβόλιμη τοποθέτηση.</b> Ο υπάλληλος μπήκε στις παρακάτω βάρδιες με ωράριο που <b>δεν ταιριάζει ακριβώς</b> με τη βάρδια (δεν ήταν η ιδανική/πρώτη επιλογή, αλλά έτσι καλύφθηκε η ανάγκη):<br>${placed.map(esc).join("<br>")}</span></div>`:""}
-      ${spots.length?`<p>Ο υπάλληλος είναι διαθέσιμος και υπάρχουν <b>ακάλυπτες βάρδιες</b> στις παρακάτω θέσεις. Θα μπορούσατε να επικοινωνήσετε μαζί του και να τον προσθέσετε:</p>
-      <ul style="margin:8px 0 0;padding-left:18px;line-height:1.9">${spots.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>`
+      ${spots.length?`<p>Ο υπάλληλος είναι διαθέσιμος και υπάρχουν <b>ακάλυπτες βάρδιες</b> στις παρακάτω θέσεις. Πατήστε «Εφάρμοσε» για να τον τοποθετήσετε (θα εμφανιστεί <b>κίτρινος</b> στο πρόγραμμα και μπορείτε να τον σβήσετε με το ✕):</p>
+      <div style="margin:8px 0 0">${spots.map(s=>`<div class="cvrow" style="justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px"><span>${esc(s.label)}</span><button class="btn brass sm" data-applyspot="${e.id}::${s.day}::${s.shId}">✓ Εφάρμοσε</button></div>`).join("")}</div>`
       :(fi?`<p class="muted">Δεν υπάρχουν αυτή τη στιγμή ακάλυπτες βάρδιες μέσα στη δηλωμένη διαθεσιμότητά του. Για να αξιοποιηθούν οι υπόλοιπες ώρες του, θα χρειαζόταν να επεκτείνει τη διαθεσιμότητά του ή να αυξηθούν οι ανάγκες σε ημέρες που είναι διαθέσιμος.</p>`:"")}
       <p class="muted" style="margin-top:12px;font-size:12px">Πληροφοριακό — η προσθήκη γίνεται από εσάς αφού συνεννοηθείτε με τον υπάλληλο.</p>
     </div>`;
@@ -3447,6 +3531,7 @@ function bind(){
     toast("Συμπληρώστε πρώτα email.",true);
   };
   $("#rqAdd").onclick=addStaffReq;
+  { const rs=$("#rptSend"); if(rs) rs.onclick=addReport; }
   { const mb=$("#rqMoreBtn"); if(mb) mb.onclick=()=>{ const m=$("#rqMore"); if(m){ const show=m.style.display==="none"; m.style.display=show?"block":"none"; mb.textContent=show?"➖ Λιγότερα":"➕ Περισσότερα"; } }; }
   { const lb=$("#rqLicBtn"); if(lb) lb.onclick=openLicensePicker; }
   $("#empAdd").onclick=addEmp;
@@ -3528,7 +3613,7 @@ function bind(){
     if(!e.target.closest(".field")) clearSug();
     const lp=e.target.closest("[data-licpick]");
     if(lp){ const v=lp.dataset.licpick||""; if($("#rqLic")) $("#rqLic").value=v; if($("#rqLicShow")) $("#rqLicShow").textContent=v||"Δεν απαιτείται"; closeModal(); return; }
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-tplload],button[data-tpldel],button[data-empinfo],button[data-jexp],button[data-jimp],button[data-shdel],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-rptres],button[data-rptdel],button[data-applyspot],button[data-shdelplace],button[data-tplload],button[data-tpldel],button[data-empinfo],button[data-jexp],button[data-jimp],button[data-shdel],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
@@ -3583,6 +3668,10 @@ function bind(){
       return;
     }
     if(d.reqcv){ if(isAdmin()) sendCV(d.reqcv); return; }
+    if(d.rptres){ const r=(DB.reports||[]).find(x=>x.id===d.rptres); if(r){ r.resolved=!r.resolved; await persist(); renderReportsAdmin(); renderMyReports(); } return; }
+    if(d.rptdel){ if(!confirm("Διαγραφή αυτής της αναφοράς;")) return; DB.reports=(DB.reports||[]).filter(x=>x.id!==d.rptdel); await persist(); renderReportsAdmin(); return; }
+    if(d.applyspot){ const [empId,day,shId]=d.applyspot.split("::"); await addManualPlace(empId,day,shId); return; }
+    if(d.shdelplace){ await removeManualPlace(d.shdelplace); return; }
     if(d.tplload){ await loadTemplate(d.tplload); return; }
     if(d.tpldel){ await deleteTemplate(d.tpldel); return; }
     if(d.empinfo){ openEmpInfo(d.empinfo); return; }
