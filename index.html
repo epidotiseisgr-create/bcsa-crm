@@ -501,9 +501,19 @@
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-h"><h2>Βάρδιες</h2><span class="sub">Ορισμός ωραρίων βάρδιας</span></div>
+      <div class="panel-b"><div id="shiftDefBox"></div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-h"><h2>Ανάγκες προσωπικού ανά ημέρα</h2><span class="sub">Πόσα άτομα ανά βάρδια · ώρες αιχμής</span></div>
+      <div class="panel-b"><div id="needsBox"></div></div>
+    </div>
+
     <div class="panel">
       <div class="panel-h"><h2>Πρόγραμμα εργασίας</h2>
-        <div class="toolbar"><button class="btn brass sm" id="expShift">Export Excel</button></div>
+        <div class="toolbar"><button class="btn brass sm" id="genShift">⚙ Αυτόματη δημιουργία</button><button class="btn ghost sm" id="expShift">Export</button></div>
       </div>
       <div id="shiftBox"></div>
     </div>
@@ -564,7 +574,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.7 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.8 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -994,26 +1004,32 @@ function monthGrid(){
   }
   return {headers:["Ημέρα","Ραντεβού"],rows,title:"Μηνιαίο Πρόγραμμα",sub:`${["Ιαν","Φεβ","Μαρ","Απρ","Μαϊ","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"][m]} ${y}`,colW:[110,760]};
 }
-/* Διάταξη Α: υπάλληλοι σε γραμμές, ημέρες σε στήλες (όπως αναρτημένο πρόγραμμα) */
+/* Διάταξη Α: βάρδιες σε γραμμές, ημέρες σε στήλες */
 async function shiftCanvasByEmp(){
-  const {hrs,data}=shiftCompute();
+  const {result,shifts}=buildSchedule();
   const rng=shiftWeekRange();
-  const headers=["Υπάλληλος"].concat(DAYS.map((d,i)=>{ const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i); return `${DAY_GR[d].slice(0,3)}\n${dt.getDate()}/${dt.getMonth()+1}`; })).concat(["Σύνολο"]);
-  const rows=data.map(x=>[x.e.name+(x.e.role?`\n${x.e.role}`:"")].concat(DAYS.map(d=>{ if(hrs[d].closed) return "—"; const s=x.days[d]; return s?s.label.replace(/, /g,"\n"):"ΡΕΠΟ"; })).concat([x.total.toFixed(1)+"h"+(x.weekly?`\n/${x.weekly}`:"")]));
-  return gridCanvas("Πρόγραμμα Εργασίας",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:46,colW:[130].concat(DAYS.map(()=>96)).concat([76])});
+  const headers=["Βάρδια"].concat(DAYS.map((d,i)=>{ const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i); return `${DAY_GR[d].slice(0,3)}\n${dt.getDate()}/${dt.getMonth()+1}`; }));
+  const rows=shifts.map(sh=>[`${sh.name}\n${shiftLabel(sh)}`].concat(DAYS.map(d=>{
+    const r=(result[d]||[]).find(x=>x.shift.id===sh.id);
+    if(!r||!r.need) return "—";
+    return r.emps.map(empName).join("\n")+(r.missing?`\n(ακάλυπτο ×${r.missing})`:"");
+  })));
+  return gridCanvas("Πρόγραμμα Βαρδιών",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:64,colW:[120].concat(DAYS.map(()=>104))});
 }
-/* Διάταξη Β: ημέρες σε γραμμές, υπάλληλοι σε στήλες */
+/* Διάταξη Β: ημέρες σε γραμμές, βάρδιες αναλυτικά */
 async function shiftCanvasByDay(){
-  const {hrs,data,emps}=shiftCompute();
+  const {result,shifts}=buildSchedule();
   const rng=shiftWeekRange();
-  const headers=["Ημέρα"].concat(emps.map(e=>e.name+(e.role?`\n${e.role}`:"")));
+  const headers=["Ημέρα"].concat(shifts.map(sh=>`${sh.name}\n${shiftLabel(sh)}`));
   const rows=DAYS.map((d,i)=>{
     const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i);
-    if(hrs[d].closed) return [`${DAY_GR[d]} ${dt.getDate()}/${dt.getMonth()+1}\nΚλειστά`].concat(emps.map(()=>"—"));
-    return [`${DAY_GR[d]} ${dt.getDate()}/${dt.getMonth()+1}\n${hoursLabel(hrs[d])}`].concat(data.map(x=>{ const s=x.days[d]; return s?s.label.replace(/, /g,"\n"):"ΡΕΠΟ"; }));
+    return [`${DAY_GR[d]}\n${dt.getDate()}/${dt.getMonth()+1}`].concat(shifts.map(sh=>{
+      const r=(result[d]||[]).find(x=>x.shift.id===sh.id);
+      if(!r||!r.need) return "—";
+      return r.emps.map(empName).join("\n")+(r.missing?`\n(ακάλυπτο ×${r.missing})`:"");
+    }));
   });
-  rows.push(["Σύνολο"].concat(data.map(x=>x.total.toFixed(1)+"h")));
-  return gridCanvas("Πρόγραμμα Εργασίας",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:44});
+  return gridCanvas("Πρόγραμμα Βαρδιών",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:64,colW:[110].concat(shifts.map(()=>130))});
 }
 function chooseShiftExport(){
   const {emps}=shiftData();
@@ -1021,14 +1037,14 @@ function chooseShiftExport(){
   const rng=shiftWeekRange();
   $("#modal").className="modal";
   $("#modal").innerHTML=`
-    <div class="modal-h"><div><h3>Εξαγωγή προγράμματος εργασίας</h3><div class="muted">Εβδομάδα ${rng.label}</div></div><button class="btn ghost sm" id="shX">✕</button></div>
+    <div class="modal-h"><div><h3>Εξαγωγή προγράμματος βαρδιών</h3><div class="muted">Εβδομάδα ${rng.label}</div></div><button class="btn ghost sm" id="shX">✕</button></div>
     <div class="modal-b">
-      <div class="sec-t">1) Διάταξη — υπάλληλοι σε γραμμές, ημέρες σε στήλες</div>
+      <div class="sec-t">1) Βάρδιες σε γραμμές, ημέρες σε στήλες</div>
       <div class="row-end" style="justify-content:flex-start;margin-bottom:12px">
         <button class="btn brass" id="shEmpImg">📷 JPG</button>
         <button class="btn ghost" id="shEmpPdf">📄 PDF</button>
       </div>
-      <div class="sec-t">2) Διάταξη — ημέρες σε γραμμές, υπάλληλοι σε στήλες</div>
+      <div class="sec-t">2) Ημέρες σε γραμμές, βάρδιες σε στήλες</div>
       <div class="row-end" style="justify-content:flex-start;margin-bottom:12px">
         <button class="btn brass" id="shDayImg">📷 JPG</button>
         <button class="btn ghost" id="shDayPdf">📄 PDF</button>
@@ -1041,11 +1057,11 @@ function chooseShiftExport(){
     </div>`;
   $("#back").classList.add("on");
   $("#shX").onclick=closeModal;
-  const fn=`Programma_Ergasias_${iso(rng.start)}`;
+  const fn=`Programma_Vardion_${iso(rng.start)}`;
   const img=async(fn2,mk)=>{ closeModal(); toast("Δημιουργία εικόνας…"); const cv=await mk(); cv.toBlob(b=>download(fn2+".jpg",b),"image/jpeg",0.92); };
   const pdf=async(fn2,mk)=>{ closeModal(); toast("Δημιουργία PDF…"); const cv=await mk(); const j=await canvasToJpegU8(cv,0.9); download(fn2+".pdf",jpegPdf(j,cv.width,cv.height)); };
-  $("#shEmpImg").onclick=()=>img(fn+"_ana_ypallilo",shiftCanvasByEmp);
-  $("#shEmpPdf").onclick=()=>pdf(fn+"_ana_ypallilo",shiftCanvasByEmp);
+  $("#shEmpImg").onclick=()=>img(fn+"_ana_vardia",shiftCanvasByEmp);
+  $("#shEmpPdf").onclick=()=>pdf(fn+"_ana_vardia",shiftCanvasByEmp);
   $("#shDayImg").onclick=()=>img(fn+"_ana_imera",shiftCanvasByDay);
   $("#shDayPdf").onclick=()=>pdf(fn+"_ana_imera",shiftCanvasByDay);
   $("#shXls").onclick=()=>{ closeModal(); download(fn+".xlsx",xlsx([sheetShift()])); };
@@ -1162,7 +1178,7 @@ const svcForType=k=>{ const t=BIZ_TYPES.find(x=>x.k===k); return t?t.svc.slice()
 const DEF_SERVICES=svcForType("consulting");
 const DEF_PROFILE={setup:false,type:"",brand:"",tagline:"",logo:"",phone:"",email:"",address:"",afm:""};
 
-let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),staffReq:[],employees:[],shophours:{},notif:[],updated:null};
+let DB={clients:[],appointments:[],history:[],services:DEF_SERVICES.slice(),profile:Object.assign({},DEF_PROFILE),staffReq:[],employees:[],shophours:{},shifts:{},needs:{},notif:[],updated:null};
 const norm=d=>{
   const o=Object.assign({clients:[],appointments:[],history:[],services:null,profile:null,updated:null},d||{});
   if(!Array.isArray(o.services)||!o.services.length) o.services=DEF_SERVICES.slice();
@@ -1171,6 +1187,8 @@ const norm=d=>{
   if(!Array.isArray(o.staffReq)) o.staffReq=[];
   if(!Array.isArray(o.employees)) o.employees=[];
   if(!o.shophours||typeof o.shophours!=="object") o.shophours={};
+  if(!o.shifts||typeof o.shifts!=="object") o.shifts={};
+  if(!o.needs||typeof o.needs!=="object") o.needs={};
   if(!Array.isArray(o.notif)) o.notif=[];
   if(typeof o.appVersion!=="string") o.appVersion="";
   return o;
@@ -2367,71 +2385,157 @@ function shiftWeekRange(){
   const s=shiftWeekStart(), e=new Date(s.getFullYear(),s.getMonth(),s.getDate()+6);
   return {start:s,end:e,label:`${grDate(iso(s))} – ${grDate(iso(e))}`};
 }
+/* ---- Βάρδιες & ανάγκες (ανά owner) ---- */
+function defShifts(){ return [
+  {id:"sh_m",name:"Πρωί",from:"08:00",to:"16:00"},
+  {id:"sh_n",name:"Μεσημέρι",from:"10:00",to:"18:00"},
+  {id:"sh_e",name:"Απόγευμα",from:"18:00",to:"02:00"}
+]; }
+const myShifts=()=>{ const id=writeOwner(); if(!DB.shifts[id]||!DB.shifts[id].length) DB.shifts[id]=defShifts(); return DB.shifts[id]; };
+const myNeeds=()=>{ const id=writeOwner(); if(!DB.needs[id]) DB.needs[id]={}; return DB.needs[id]; };
+function shiftHours(sh){ let s=toMin(sh.from),e=toMin(sh.to); if(e<=s)e+=1440; return Math.round((e-s)/6)/10; }
+const shiftLabel=sh=>`${sh.from}–${sh.to}`;
+/* Μπορεί ο υπάλληλος να πάρει αυτή τη βάρδια αυτή τη μέρα; */
+function empAvailForShift(e,day,sh){
+  const a=(e.avail&&e.avail[day])||{mode:"yes"};
+  if(a.mode==="no") return false;
+  if(a.mode==="yes") return true;
+  const segs=availSegs(e,day);
+  let s=toMin(sh.from),en=toMin(sh.to); if(en<=s)en=1440;
+  return segs.some(([x,y])=>x<=s&&y>=en);
+}
 function shiftData(){
+  const emps=mineEmp(), shifts=myShifts(), needs=myNeeds();
   const hrs = isAdmin()&&viewScope!=="all"&&viewScope!=="self" ? normHours(DB.shophours[viewScope]||defHours()) : myHours();
-  const emps=mineEmp();
-  return {hrs,emps};
+  return {emps,shifts,needs,hrs};
 }
-/* Υπολογισμός: για κάθε υπάλληλο, ώρες/ημέρα, σύνολο, υπερβάσεις */
-function shiftCompute(){
-  const {hrs,emps}=shiftData();
-  const data=emps.map(e=>{
-    const days={}; let total=0, over=false;
-    DAYS.forEach(d=>{ const s=empShift(e,d,hrs); days[d]=s; if(s){ total+=s.hours; if(s.hours>MAX_DAY_H) over=true; } });
-    const weekly=e.weekly||0;
-    return {e,days,total:Math.round(total*10)/10,over,weekly,overWeek:weekly>0&&total>weekly+0.01};
+/* ---- Αλγόριθμος ανάθεσης βαρδιών ---- */
+function buildSchedule(){
+  const {emps,shifts,needs}=shiftData();
+  const hours={}, cnt={}; emps.forEach(e=>{hours[e.id]=0;cnt[e.id]=0;});
+  const result={}; const warns=[]; const seen={};
+  DAYS.forEach(day=>{
+    result[day]=[];
+    const dayAssigned=new Set();
+    shifts.forEach(sh=>{
+      const need=(needs[day]&&needs[day][sh.id])||0;
+      if(!need) return;
+      const H=shiftHours(sh);
+      const assigned=[];
+      for(let i=0;i<need;i++){
+        let cands=emps.filter(e=>!dayAssigned.has(e.id)&&empAvailForShift(e,day,sh)&&(!(e.weekly>0)||hours[e.id]+H<=e.weekly+0.01));
+        let overflow=false;
+        if(!cands.length){ cands=emps.filter(e=>!dayAssigned.has(e.id)&&empAvailForShift(e,day,sh)); overflow=true; }
+        if(!cands.length){ warns.push(`${DAY_GR[day]} · ${sh.name}: ακάλυπτη θέση (${need-i} από ${need}).`); break; }
+        cands.sort((a,b)=>{
+          const da=(a.weekly>0?a.weekly:99)-hours[a.id], db=(b.weekly>0?b.weekly:99)-hours[b.id];
+          if(Math.abs(db-da)>0.01) return db-da;
+          return cnt[a.id]-cnt[b.id];
+        });
+        const pick=cands[0];
+        assigned.push(pick.id); dayAssigned.add(pick.id); hours[pick.id]+=H; cnt[pick.id]++;
+        if(overflow&&pick.weekly>0&&!seen["ov"+pick.id]){ warns.push(`${pick.name}: ξεπερνά τον στόχο ωρών (τελικά ${hours[pick.id]}h / ${pick.weekly}h).`); seen["ov"+pick.id]=1; }
+      }
+      result[day].push({shift:sh,emps:assigned,need,missing:need-assigned.length});
+    });
   });
-  return {hrs,emps,data};
+  return {result,hours,emps,shifts,warns};
 }
+const empName=id=>{ const {emps}=shiftData(); const e=emps.find(x=>x.id===id); return e?e.name:""; };
+
+/* ---- Ορισμός βαρδιών ---- */
+function renderShiftDef(){
+  const box=$("#shiftDefBox"); if(!box) return;
+  const shifts=myShifts();
+  box.innerHTML=`<table><thead><tr><th>Όνομα</th><th>Από</th><th>Έως</th><th>Διάρκεια</th><th></th></tr></thead><tbody>${
+    shifts.map(sh=>`<tr>
+      <td><input data-shname="${sh.id}" value="${esc(sh.name)}" style="width:130px"></td>
+      <td><input type="time" data-shfrom="${sh.id}" value="${sh.from}" style="width:auto"></td>
+      <td><input type="time" data-shto="${sh.id}" value="${sh.to}" style="width:auto"></td>
+      <td class="mono muted">${shiftHours(sh)}h${shiftHours(sh)>MAX_DAY_H?' <span style="color:#A83A2C">⚠</span>':''}</td>
+      <td style="text-align:right"><button class="btn danger sm" data-shdel="${sh.id}">✕</button></td>
+    </tr>`).join("")}</tbody></table>
+    <div class="row-end" style="justify-content:flex-start;margin-top:10px"><button class="btn ghost sm" id="shAdd">+ Νέα βάρδια</button></div>
+    <p class="muted" style="margin-top:6px">Τυπικές βάρδιες: 08:00–16:00, 10:00–18:00, 18:00–02:00 (νυχτερινή). Αλλάξτε ελεύθερα.</p>`;
+  $$('[data-shname]').forEach(inp=>inp.onchange=async()=>{ const sh=myShifts().find(x=>x.id===inp.dataset.shname); if(sh){ sh.name=inp.value.trim()||"Βάρδια"; await persist(); renderNeeds(); } });
+  $$('[data-shfrom]').forEach(inp=>inp.onchange=async()=>{ const sh=myShifts().find(x=>x.id===inp.dataset.shfrom); if(sh){ sh.from=inp.value; await persist(); renderShiftDef(); } });
+  $$('[data-shto]').forEach(inp=>inp.onchange=async()=>{ const sh=myShifts().find(x=>x.id===inp.dataset.shto); if(sh){ sh.to=inp.value; await persist(); renderShiftDef(); } });
+  $("#shAdd").onclick=async()=>{ myShifts().push({id:"sh_"+uid(),name:"Νέα βάρδια",from:"09:00",to:"17:00"}); await persist(); renderShiftDef(); renderNeeds(); };
+}
+/* ---- Ανάγκες ανά ημέρα (πίνακας μέρα × βάρδια → άτομα) ---- */
+function renderNeeds(){
+  const box=$("#needsBox"); if(!box) return;
+  const shifts=myShifts(), needs=myNeeds();
+  const totalPerDay=d=>shifts.reduce((s,sh)=>s+((needs[d]&&needs[d][sh.id])||0),0);
+  const peak=Math.max(1,...DAYS.map(totalPerDay));
+  box.innerHTML=`<table><thead><tr><th>Ημέρα</th>${shifts.map(sh=>`<th style="text-align:center">${esc(sh.name)}<div class="muted" style="font-weight:400;font-size:10.5px">${shiftLabel(sh)}</div></th>`).join("")}<th style="text-align:center">Σύνολο</th></tr></thead><tbody>${
+    DAYS.map(d=>{
+      const tot=totalPerDay(d), isPeak=tot>=peak&&tot>0;
+      return `<tr${isPeak?' style="background:#FBF4E6"':''}>
+        <td class="name">${DAY_GR[d]}${isPeak?' <span class="pill p-sched" style="font-size:10px">αιχμή</span>':''}</td>
+        ${shifts.map(sh=>`<td style="text-align:center"><input type="number" min="0" max="9" data-need="${d}:${sh.id}" value="${(needs[d]&&needs[d][sh.id])||0}" style="width:52px;text-align:center;padding:4px"></td>`).join("")}
+        <td class="mono" style="text-align:center;font-weight:600">${tot}</td>
+      </tr>`;
+    }).join("")}</tbody></table>
+    <p class="muted" style="margin-top:8px">Ορίστε πόσα άτομα χρειάζεστε σε κάθε βάρδια, ανά ημέρα. Βάλτε μεγαλύτερους αριθμούς στις <b>ώρες αιχμής</b> (π.χ. Παρασκευή/Σάββατο) — επισημαίνονται αυτόματα. 0 = δεν λειτουργεί η βάρδια εκείνη τη μέρα.</p>`;
+  $$('[data-need]').forEach(inp=>inp.onchange=async()=>{
+    const [d,sid]=inp.dataset.need.split(":"); const n=myNeeds();
+    if(!n[d]) n[d]={}; n[d][sid]=Math.max(0,parseInt(inp.value)||0);
+    await persist(); renderNeeds(); renderShift();
+  });
+}
+/* ---- Εμφάνιση προγράμματος (αποτέλεσμα ανάθεσης) ---- */
 function renderShift(){
   const box=$("#shiftBox"); if(!box) return;
-  const {hrs,emps,data}=shiftCompute();
+  const {emps,shifts}=shiftData();
   const rng=shiftWeekRange();
-  if(!emps.length){ box.innerHTML='<div class="empty"><strong>Χωρίς πρόγραμμα</strong>Προσθέστε υπαλλήλους και ορίστε ωράριο λειτουργίας.</div>'; return; }
-  const warns=[];
-  data.forEach(x=>{ if(x.over) warns.push(`${x.e.name}: υπάρχει ημέρα άνω των ${MAX_DAY_H} ωρών.`); if(x.overWeek) warns.push(`${x.e.name}: σύνολο ${x.total}h > στόχος ${x.weekly}h.`); });
-  const body=DAYS.map(d=>{
-    if(hrs[d].closed) return `<tr><td class="name">${DAY_GR[d]}</td><td colspan="${emps.length}" class="muted" style="text-align:center">Κλειστά</td></tr>`;
-    const cells=data.map(x=>{
-      const s=x.days[d];
-      if(!s) return `<td class="muted" style="text-align:center">ΡΕΠΟ</td>`;
-      const warn=s.hours>MAX_DAY_H;
-      return `<td style="text-align:center">${s.segs.map(([f,t])=>`<span class="pill ${warn?"p-canc":"p-done"}" style="margin:1px 0;display:inline-block">${toHHMM(f)}–${toHHMM(t)}</span>`).join("<br>")}<div class="muted" style="font-size:10px">${s.hours}h${warn?" ⚠":""}</div></td>`;
-    }).join("");
-    return `<tr><td class="name">${DAY_GR[d]}<div class="muted mono" style="font-size:10.5px">${hoursLabel(hrs[d])}</div></td>${cells}</tr>`;
-  }).join("");
-  box.innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2)">
+  if(!emps.length){ box.innerHTML='<div class="empty"><strong>Χωρίς πρόγραμμα</strong>Προσθέστε υπαλλήλους, βάρδιες και ανάγκες, μετά πατήστε «Αυτόματη δημιουργία».</div>'; return; }
+  const {result,hours,warns}=buildSchedule();
+  const nav=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2)">
       <button class="btn ghost sm" id="shPrev">◀</button>
       <b style="font-family:'Noto Serif',serif">Εβδομάδα: ${rng.label}</b>
       <button class="btn ghost sm" id="shNext">▶</button>
       <button class="btn ghost sm" id="shThis">Τρέχουσα</button>
-    </div>
-    ${warns.length?`<div class="flag warn" style="margin:10px 14px"><span>⚠</span><span>${warns.map(esc).join("<br>")}</span></div>`:""}
-    <table><thead><tr><th>Ημέρα</th>${data.map(x=>`<th style="text-align:center">${esc(x.e.name)}${x.e.role?`<div class="muted" style="font-weight:400">${esc(x.e.role)}</div>`:""}${x.weekly?`<div class="muted" style="font-weight:400;font-size:10.5px">στόχος ${x.weekly}h</div>`:""}</th>`).join("")}</tr></thead>
-    <tbody>${body}
-    <tr style="background:#FAFBFA"><td class="name">Σύνολο ωρών</td>${data.map(x=>`<td class="mono" style="text-align:center;font-weight:600;color:${x.over||x.overWeek?"#A83A2C":"inherit"}">${x.total.toFixed(1)}h${x.weekly?` / ${x.weekly}`:""}</td>`).join("")}</tr>
-    </tbody></table>`;
+    </div>`;
+  const body=DAYS.map(d=>{
+    const rows=result[d].filter(r=>r.need>0);
+    if(!rows.length) return `<tr><td class="name">${DAY_GR[d]}</td><td colspan="2" class="muted">— καμία βάρδια —</td></tr>`;
+    return rows.map((r,i)=>`<tr>
+      ${i===0?`<td class="name" rowspan="${rows.length}" style="vertical-align:top">${DAY_GR[d]}</td>`:""}
+      <td style="white-space:nowrap"><b>${esc(r.shift.name)}</b> <span class="muted mono">${shiftLabel(r.shift)}</span></td>
+      <td>${r.emps.map(id=>`<span class="pill p-done" style="margin:1px 3px 1px 0;display:inline-block">${esc(empName(id))}</span>`).join("")}${r.missing?`<span class="pill p-canc">Ακάλυπτο ×${r.missing}</span>`:""}</td>
+    </tr>`).join("");
+  }).join("");
+  const hoursRows=emps.map(e=>{ const h=Math.round((hours[e.id]||0)*10)/10; const over=e.weekly>0&&h>e.weekly+0.01; return `<tr><td class="name">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}</td><td class="mono" style="text-align:right;color:${over?"#A83A2C":"inherit"};font-weight:600">${h}h${e.weekly?` / ${e.weekly}h`:""}</td></tr>`; }).join("");
+  box.innerHTML=nav+
+    (warns.length?`<div class="flag warn" style="margin:10px 14px"><span>⚠</span><span>${warns.map(esc).join("<br>")}</span></div>`:'<div class="flag match" style="margin:10px 14px"><span>✓</span><span>Το πρόγραμμα καλύπτει όλες τις ανάγκες χωρίς υπέρβαση ωρών.</span></div>')+
+    `<table><thead><tr><th>Ημέρα</th><th>Βάρδια</th><th>Προσωπικό</th></tr></thead><tbody>${body}</tbody></table>
+    <div class="sec-t" style="padding:0 14px;margin-top:14px">Σύνολο ωρών ανά υπάλληλο (εβδομάδα)</div>
+    <table style="margin-top:4px"><tbody>${hoursRows}</tbody></table>`;
   $("#shPrev").onclick=()=>{ const s=shiftWeekStart(); shiftWeek=new Date(s.getFullYear(),s.getMonth(),s.getDate()-7); renderShift(); };
   $("#shNext").onclick=()=>{ const s=shiftWeekStart(); shiftWeek=new Date(s.getFullYear(),s.getMonth(),s.getDate()+7); renderShift(); };
   $("#shThis").onclick=()=>{ shiftWeek=mondayOf(new Date()); renderShift(); };
 }
+/* ---- Excel του προγράμματος ---- */
 function sheetShift(){
-  const {hrs,emps,data}=shiftCompute();
-  const rows=[["Ημέρα","Ωράριο"].concat(emps.map(e=>e.name+(e.role?` (${e.role})`:"")))];
+  const {result,hours,emps,shifts}=buildSchedule();
+  const rows=[["Ημέρα","Βάρδια","Ώρες","Προσωπικό"]];
   DAYS.forEach(d=>{
-    if(hrs[d].closed){ rows.push([DAY_GR[d],"Κλειστά"].concat(emps.map(()=>"ΡΕΠΟ"))); return; }
-    rows.push([DAY_GR[d],hoursLabel(hrs[d])].concat(data.map(x=>{ const s=x.days[d]; return s?s.label:"ΡΕΠΟ"; })));
+    const rr=result[d].filter(r=>r.need>0);
+    if(!rr.length){ rows.push([DAY_GR[d],"—","",""]); return; }
+    rr.forEach((r,i)=>rows.push([i===0?DAY_GR[d]:"",r.shift.name+" ("+shiftLabel(r.shift)+")",shiftHours(r.shift),r.emps.map(empName).join(", ")+(r.missing?` [ακάλυπτο ×${r.missing}]`:"")]));
   });
-  rows.push(["Σύνολο ωρών",""].concat(data.map(x=>x.total.toFixed(1)+"h"+(x.weekly?` / ${x.weekly}`:""))));
-  return {name:"Πρόγραμμα εργασίας",widths:[14,20].concat(emps.map(()=>20)),rows};
+  rows.push(["","","",""]);
+  rows.push(["ΣΥΝΟΛΟ ΩΡΩΝ","","",""]);
+  emps.forEach(e=>rows.push([e.name,e.role||"",Math.round((hours[e.id]||0)*10)/10+"h"+(e.weekly?" / "+e.weekly+"h":""),""]));
+  return {name:"Πρόγραμμα βαρδιών",widths:[14,26,10,60],rows};
 }
 
 function renderStaffCounts(){
   const n = isAdmin() ? DB.staffReq.filter(r=>r.status!=="done").length : 0;
   const el=$("#nStaff"); if(el) el.textContent=n?String(n):"";
 }
-function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
+function renderAll(){ renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderHours(); renderEmp(); renderShiftDef(); renderNeeds(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
 function openClient(id){
@@ -2923,6 +3027,7 @@ function bind(){
   $("#rqAdd").onclick=addStaffReq;
   $("#empAdd").onclick=addEmp;
   $("#expShift").onclick=()=>chooseShiftExport();
+  $("#genShift").onclick=()=>{ renderShift(); toast("Το πρόγραμμα δημιουργήθηκε."); };
   $("#svcAdd").onclick=async()=>{
     const v=$("#svcNew").value.trim();
     if(!v) return;
@@ -2995,7 +3100,7 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-shdel],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
@@ -3045,6 +3150,11 @@ function bind(){
       return;
     }
     if(d.reqcv){ if(isAdmin()) sendCV(d.reqcv); return; }
+    if(d.shdel){
+      const list=myShifts(); const sh=list.find(x=>x.id===d.shdel);
+      if(sh&&confirm(`Διαγραφή βάρδιας «${sh.name}»;`)){ const id=writeOwner(); DB.shifts[id]=list.filter(x=>x.id!==d.shdel); Object.keys(DB.needs[id]||{}).forEach(dd=>{ if(DB.needs[id][dd]) delete DB.needs[id][dd][d.shdel]; }); await persist(); renderShiftDef(); renderNeeds(); renderShift(); }
+      return;
+    }
     if(d.empdel){
       const em=DB.employees.find(x=>x.id===d.empdel);
       if(em&&confirm(`Διαγραφή υπαλλήλου «${em.name}»;`)){ DB.employees=DB.employees.filter(x=>x.id!==d.empdel); await persist(); toast("Διαγράφηκε."); }
