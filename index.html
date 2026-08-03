@@ -35,6 +35,7 @@
   .bellbadge.on{display:block}
   .cvrow{display:flex;gap:8px;align-items:center;padding:6px 8px;margin-top:4px;border:1px solid var(--line-2);border-radius:4px;background:#FCFDFC}
   .cvrow.cv-chosen{border-color:var(--sea,#1E6E6A);background:#EAF5F3}
+  .cvrow.cv-rejected{border-color:#E8A99E;background:#FBEDEA;opacity:.85}
   .cvrow-sm{display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12.5px}
   .cvrow-sm.cv-chosen{font-weight:600}
   @keyframes blinkbtn{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(176,132,47,.5)}50%{opacity:.55;box-shadow:0 0 0 4px rgba(176,132,47,.25)}}
@@ -490,9 +491,10 @@
     <div class="panel" style="margin-bottom:22px">
       <div class="panel-h"><h2>Υπάλληλοι</h2><span class="sub">Στοιχεία &amp; διαθεσιμότητα</span></div>
       <div class="panel-b">
-        <div class="two" style="grid-template-columns:1fr 1fr auto;align-items:end">
+        <div class="two" style="grid-template-columns:1fr 1fr 130px auto;align-items:end">
           <div class="field" style="margin:0"><label for="empName">Ονοματεπώνυμο</label><input id="empName" placeholder="π.χ. Ελένη Δ."></div>
           <div class="field" style="margin:0"><label for="empRole">Θέση</label><input id="empRole" placeholder="π.χ. Κομμώτρια"></div>
+          <div class="field" style="margin:0"><label for="empWeekly">Ώρες/εβδ.</label><input id="empWeekly" type="number" min="0" step="1" placeholder="π.χ. 25"></div>
           <button class="btn brass" id="empAdd">Προσθήκη</button>
         </div>
         <div id="empList" style="margin-top:16px"></div>
@@ -562,7 +564,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.6 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v4.7 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -992,36 +994,60 @@ function monthGrid(){
   }
   return {headers:["Ημέρα","Ραντεβού"],rows,title:"Μηνιαίο Πρόγραμμα",sub:`${["Ιαν","Φεβ","Μαρ","Απρ","Μαϊ","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"][m]} ${y}`,colW:[110,760]};
 }
-async function shiftCanvas(){
-  const {hrs,emps}=shiftData();
+/* Διάταξη Α: υπάλληλοι σε γραμμές, ημέρες σε στήλες (όπως αναρτημένο πρόγραμμα) */
+async function shiftCanvasByEmp(){
+  const {hrs,data}=shiftCompute();
+  const rng=shiftWeekRange();
+  const headers=["Υπάλληλος"].concat(DAYS.map((d,i)=>{ const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i); return `${DAY_GR[d].slice(0,3)}\n${dt.getDate()}/${dt.getMonth()+1}`; })).concat(["Σύνολο"]);
+  const rows=data.map(x=>[x.e.name+(x.e.role?`\n${x.e.role}`:"")].concat(DAYS.map(d=>{ if(hrs[d].closed) return "—"; const s=x.days[d]; return s?s.label.replace(/, /g,"\n"):"ΡΕΠΟ"; })).concat([x.total.toFixed(1)+"h"+(x.weekly?`\n/${x.weekly}`:"")]));
+  return gridCanvas("Πρόγραμμα Εργασίας",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:46,colW:[130].concat(DAYS.map(()=>96)).concat([76])});
+}
+/* Διάταξη Β: ημέρες σε γραμμές, υπάλληλοι σε στήλες */
+async function shiftCanvasByDay(){
+  const {hrs,data,emps}=shiftCompute();
+  const rng=shiftWeekRange();
   const headers=["Ημέρα"].concat(emps.map(e=>e.name+(e.role?`\n${e.role}`:"")));
-  const totals={}; emps.forEach(e=>totals[e.id]=0);
-  const rows=DAYS.map(d=>{
-    if(hrs[d].closed) return [DAY_GR[d]].concat(emps.map(()=>"Κλειστά"));
-    return [`${DAY_GR[d]}\n${hoursLabel(hrs[d])}`].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return s.label; }));
+  const rows=DAYS.map((d,i)=>{
+    const dt=new Date(rng.start.getFullYear(),rng.start.getMonth(),rng.start.getDate()+i);
+    if(hrs[d].closed) return [`${DAY_GR[d]} ${dt.getDate()}/${dt.getMonth()+1}\nΚλειστά`].concat(emps.map(()=>"—"));
+    return [`${DAY_GR[d]} ${dt.getDate()}/${dt.getMonth()+1}\n${hoursLabel(hrs[d])}`].concat(data.map(x=>{ const s=x.days[d]; return s?s.label.replace(/, /g,"\n"):"ΡΕΠΟ"; }));
   });
-  rows.push(["Σύνολο"].concat(emps.map(e=>totals[e.id].toFixed(1)+"h")));
-  return gridCanvas("Πρόγραμμα Εργασίας",prof().brand||"",headers,rows,{rowH:40});
+  rows.push(["Σύνολο"].concat(data.map(x=>x.total.toFixed(1)+"h")));
+  return gridCanvas("Πρόγραμμα Εργασίας",`${prof().brand||""}  ·  Εβδομάδα ${rng.label}`,headers,rows,{rowH:44});
 }
 function chooseShiftExport(){
   const {emps}=shiftData();
   if(!emps.length){ toast("Προσθέστε πρώτα υπαλλήλους.",true); return; }
+  const rng=shiftWeekRange();
   $("#modal").className="modal";
   $("#modal").innerHTML=`
-    <div class="modal-h"><div><h3>Εξαγωγή προγράμματος εργασίας</h3><div class="muted">Προσωπικό σε στήλες, ημέρες σε γραμμές</div></div><button class="btn ghost sm" id="shX">✕</button></div>
+    <div class="modal-h"><div><h3>Εξαγωγή προγράμματος εργασίας</h3><div class="muted">Εβδομάδα ${rng.label}</div></div><button class="btn ghost sm" id="shX">✕</button></div>
     <div class="modal-b">
-      <p class="muted">Αποθηκεύεται στη συσκευή (κινητό, tablet, υπολογιστή).</p>
-      <div class="row-end" style="justify-content:flex-start">
-        <button class="btn brass" id="shImg">📷 Εικόνα (JPG)</button>
-        <button class="btn brass" id="shPdf">📄 PDF</button>
-        <button class="btn brass" id="shXls">📊 Excel</button>
+      <div class="sec-t">1) Διάταξη — υπάλληλοι σε γραμμές, ημέρες σε στήλες</div>
+      <div class="row-end" style="justify-content:flex-start;margin-bottom:12px">
+        <button class="btn brass" id="shEmpImg">📷 JPG</button>
+        <button class="btn ghost" id="shEmpPdf">📄 PDF</button>
       </div>
+      <div class="sec-t">2) Διάταξη — ημέρες σε γραμμές, υπάλληλοι σε στήλες</div>
+      <div class="row-end" style="justify-content:flex-start;margin-bottom:12px">
+        <button class="btn brass" id="shDayImg">📷 JPG</button>
+        <button class="btn ghost" id="shDayPdf">📄 PDF</button>
+      </div>
+      <div class="sec-t">Excel</div>
+      <div class="row-end" style="justify-content:flex-start">
+        <button class="btn ghost" id="shXls">📊 Excel</button>
+      </div>
+      <p class="muted" style="margin-top:10px">Το JPG κατεβαίνει στη συσκευή και ανοίγει με οποιοδήποτε πρόγραμμα εικόνας — ιδανικό για κινητό/tablet.</p>
     </div>`;
   $("#back").classList.add("on");
   $("#shX").onclick=closeModal;
-  const fn=`Programma_Ergasias_${todayISO()}`;
-  $("#shImg").onclick=async()=>{ closeModal(); toast("Δημιουργία εικόνας…"); const cv=await shiftCanvas(); cv.toBlob(b=>download(fn+".jpg",b),"image/jpeg",0.92); };
-  $("#shPdf").onclick=async()=>{ closeModal(); toast("Δημιουργία PDF…"); const cv=await shiftCanvas(); const j=await canvasToJpegU8(cv,0.9); download(fn+".pdf",jpegPdf(j,cv.width,cv.height)); };
+  const fn=`Programma_Ergasias_${iso(rng.start)}`;
+  const img=async(fn2,mk)=>{ closeModal(); toast("Δημιουργία εικόνας…"); const cv=await mk(); cv.toBlob(b=>download(fn2+".jpg",b),"image/jpeg",0.92); };
+  const pdf=async(fn2,mk)=>{ closeModal(); toast("Δημιουργία PDF…"); const cv=await mk(); const j=await canvasToJpegU8(cv,0.9); download(fn2+".pdf",jpegPdf(j,cv.width,cv.height)); };
+  $("#shEmpImg").onclick=()=>img(fn+"_ana_ypallilo",shiftCanvasByEmp);
+  $("#shEmpPdf").onclick=()=>pdf(fn+"_ana_ypallilo",shiftCanvasByEmp);
+  $("#shDayImg").onclick=()=>img(fn+"_ana_imera",shiftCanvasByDay);
+  $("#shDayPdf").onclick=()=>pdf(fn+"_ana_imera",shiftCanvasByDay);
   $("#shXls").onclick=()=>{ closeModal(); download(fn+".xlsx",xlsx([sheetShift()])); };
 }
 function slots15(){
@@ -2120,11 +2146,12 @@ function renderMyReq(){
         ${r.note?`<div class="t">${esc(r.note)}</div>`:""}
         ${r.status==="rejected"&&r.reason?`<div class="t" style="color:#A83A2C">Αιτιολογία: ${esc(REJECT_REASON[r.reason]||r.reason)}</div>`:""}
         ${(r.cvs&&r.cvs.length)?`<div class="t" style="margin-top:8px"><b>Βιογραφικά που λάβατε — επιλέξτε ενδιαφέρον:</b>
-          ${r.cvs.map(cv=>`<div class="cvrow ${cv.chosen?"cv-chosen":""}">
-            <div style="flex:1;min-width:0">📎 <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0">${esc(cv.link)}</a>${cv.note?`<div class="muted" style="font-size:12px">${esc(cv.note)}</div>`:""}</div>
+          ${r.cvs.map(cv=>`<div class="cvrow ${cv.chosen?"cv-chosen":""} ${cv.rejected?"cv-rejected":""}">
+            <div style="flex:1;min-width:0">📎 <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0">${esc(cv.link)}</a>${cv.note?`<div class="muted" style="font-size:12px">${esc(cv.note)}</div>`:""}${cv.rejected?'<div style="color:#B0392B;font-size:12px">✕ Δεν σας ενδιαφέρει</div>':""}</div>
             <div style="white-space:nowrap;display:flex;gap:5px;align-items:center">
               <button class="btn ${cv.interview?"brass":"ghost"} sm" data-cvint="${r.id}:${cv.id}" title="Για συνέντευξη">${cv.interview?"★ Συνέντευξη":"☆ Συνέντευξη"}</button>
               <button class="btn ${cv.chosen?"brass":"ghost"} sm" data-cvpick="${r.id}:${cv.id}" title="Επικρατέστερο">${cv.chosen?"✓ Επικρατέστερο":"Επιλογή"}</button>
+              <button class="btn ${cv.rejected?"danger":"ghost"} sm" data-cvrej="${r.id}:${cv.id}" title="Δεν με ενδιαφέρει">${cv.rejected?"✕ Απορρίφθηκε":"Δεν με ενδιαφέρει"}</button>
             </div>
           </div>`).join("")}
           ${r.finalPicked?`<div class="t" style="color:#1E6E6A;margin-top:4px">✓ Επιλέξατε επικρατέστερο βιογραφικό. Ο διαχειριστής ενημερώθηκε για ολοκλήρωση.</div>`:'<div class="muted" style="margin-top:4px;font-size:12px">Σημειώστε ★ όσα θέλετε για συνέντευξη· πατήστε «Επιλογή» στο επικρατέστερο.</div>'}
@@ -2142,9 +2169,10 @@ function renderReqAdmin(){
     DB.staffReq.slice().sort((a,b)=>b.ts-a.ts).map(r=>{
       const cvs=r.cvs||[];
       const cvHtml = cvs.length ? cvs.map(cv=>`<div class="cvrow-sm ${cv.chosen?"cv-chosen":""}">
-          <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">📎 ${esc(cv.link)}</a>
+          <a href="${esc(cv.link)}" target="_blank" rel="noopener" class="lnk" style="border:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis${cv.rejected?";text-decoration:line-through;color:#B0392B":""}">📎 ${esc(cv.link)}</a>
           ${cv.interview?'<span class="pill p-sched" title="Επιλέχθηκε για συνέντευξη">★ συνέντ.</span>':""}
           ${cv.chosen?'<span class="pill p-done" title="Επικρατέστερο">✓ επικρατ.</span>':""}
+          ${cv.rejected?'<span class="pill p-canc" title="Δεν ενδιαφέρει τον χρήστη">✕ απορ.</span>':""}
         </div>`).join("") : '<span class="muted">— κανένα ακόμη —</span>';
       const finBlink = r.finalPicked && r.status==="accepted";
       return `<tr>
@@ -2261,8 +2289,8 @@ async function addEmp(){
   const name=$("#empName").value.trim();
   if(!name){ toast("Συμπληρώστε όνομα υπαλλήλου.",true); return; }
   const avail={}; DAYS.forEach(d=>avail[d]={mode:"yes",from:"",to:"",from2:"",to2:""});
-  DB.employees.push({id:uid(),owner:writeOwner(),name,role:$("#empRole").value.trim(),avail});
-  $("#empName").value=""; $("#empRole").value="";
+  DB.employees.push({id:uid(),owner:writeOwner(),name,role:$("#empRole").value.trim(),weekly:num($("#empWeekly")?$("#empWeekly").value:0)||0,avail});
+  $("#empName").value=""; $("#empRole").value=""; if($("#empWeekly")) $("#empWeekly").value="";
   await persist(); toast("Ο υπάλληλος προστέθηκε.");
 }
 function renderEmp(){
@@ -2273,7 +2301,10 @@ function renderEmp(){
     <div class="panel" style="margin-bottom:12px;box-shadow:none">
       <div class="panel-h" style="padding:10px 14px">
         <h2 style="font-size:14px">${esc(e.name)}${e.role?` <span class="muted">· ${esc(e.role)}</span>`:""}</h2>
-        <button class="btn danger sm" data-empdel="${e.id}">✕ Διαγραφή</button>
+        <div class="toolbar" style="align-items:center;gap:8px">
+          <label class="muted" style="font-size:12px;display:flex;align-items:center;gap:5px">Ώρες/εβδ.: <input type="number" min="0" step="1" data-empweekly="${e.id}" value="${e.weekly||""}" placeholder="—" style="width:64px;padding:3px 6px"></label>
+          <button class="btn danger sm" data-empdel="${e.id}">✕ Διαγραφή</button>
+        </div>
       </div>
       <div class="panel-b" style="padding:12px 14px">
         <div class="sec-t">Σταθερή εβδομαδιαία διαθεσιμότητα</div>
@@ -2300,6 +2331,7 @@ function renderEmp(){
   });
   upd("select","empmode","mode"); upd("input","empfrom","from"); upd("input","empto","to");
   upd("input","empfrom2","from2"); upd("input","empto2","to2");
+  $$('[data-empweekly]').forEach(inp=>inp.onchange=async()=>{ const e=DB.employees.find(x=>x.id===inp.dataset.empweekly); if(e){ e.weekly=num(inp.value)||0; await persist(); renderShift(); } });
 }
 
 /* --- Υπολογισμός προγράμματος: τομή ωραρίου καταστήματος × διαθεσιμότητας --- */
@@ -2327,40 +2359,71 @@ function empShift(e,d,hrs){
   return {segs:out, hours:Math.round(mins/6)/10, label:out.map(([f,t])=>`${toHHMM(f)}–${toHHMM(t)}`).join(", ")};
 }
 const hoursLabel=day=>day.closed?"Κλειστά":storeSegs(day).map(([f,t])=>`${toHHMM(f)}–${toHHMM(t)}`).join(", ");
+const MAX_DAY_H=8;
+/* Τρέχουσα εβδομάδα προγράμματος εργασίας (Δευτέρα–Κυριακή) */
+let shiftWeek=null;
+function shiftWeekStart(){ if(!shiftWeek) shiftWeek=mondayOf(new Date()); return shiftWeek; }
+function shiftWeekRange(){
+  const s=shiftWeekStart(), e=new Date(s.getFullYear(),s.getMonth(),s.getDate()+6);
+  return {start:s,end:e,label:`${grDate(iso(s))} – ${grDate(iso(e))}`};
+}
 function shiftData(){
   const hrs = isAdmin()&&viewScope!=="all"&&viewScope!=="self" ? normHours(DB.shophours[viewScope]||defHours()) : myHours();
   const emps=mineEmp();
   return {hrs,emps};
 }
+/* Υπολογισμός: για κάθε υπάλληλο, ώρες/ημέρα, σύνολο, υπερβάσεις */
+function shiftCompute(){
+  const {hrs,emps}=shiftData();
+  const data=emps.map(e=>{
+    const days={}; let total=0, over=false;
+    DAYS.forEach(d=>{ const s=empShift(e,d,hrs); days[d]=s; if(s){ total+=s.hours; if(s.hours>MAX_DAY_H) over=true; } });
+    const weekly=e.weekly||0;
+    return {e,days,total:Math.round(total*10)/10,over,weekly,overWeek:weekly>0&&total>weekly+0.01};
+  });
+  return {hrs,emps,data};
+}
 function renderShift(){
   const box=$("#shiftBox"); if(!box) return;
-  const {hrs,emps}=shiftData();
+  const {hrs,emps,data}=shiftCompute();
+  const rng=shiftWeekRange();
   if(!emps.length){ box.innerHTML='<div class="empty"><strong>Χωρίς πρόγραμμα</strong>Προσθέστε υπαλλήλους και ορίστε ωράριο λειτουργίας.</div>'; return; }
-  let totalH={}; emps.forEach(e=>totalH[e.id]=0);
+  const warns=[];
+  data.forEach(x=>{ if(x.over) warns.push(`${x.e.name}: υπάρχει ημέρα άνω των ${MAX_DAY_H} ωρών.`); if(x.overWeek) warns.push(`${x.e.name}: σύνολο ${x.total}h > στόχος ${x.weekly}h.`); });
   const body=DAYS.map(d=>{
     if(hrs[d].closed) return `<tr><td class="name">${DAY_GR[d]}</td><td colspan="${emps.length}" class="muted" style="text-align:center">Κλειστά</td></tr>`;
-    const cells=emps.map(e=>{
-      const s=empShift(e,d,hrs);
-      if(!s) return `<td class="muted" style="text-align:center">—</td>`;
-      totalH[e.id]+=s.hours;
-      return `<td style="text-align:center">${s.segs.map(([f,t])=>`<span class="pill p-done" style="margin:1px 0;display:inline-block">${toHHMM(f)}–${toHHMM(t)}</span>`).join("<br>")}</td>`;
+    const cells=data.map(x=>{
+      const s=x.days[d];
+      if(!s) return `<td class="muted" style="text-align:center">ΡΕΠΟ</td>`;
+      const warn=s.hours>MAX_DAY_H;
+      return `<td style="text-align:center">${s.segs.map(([f,t])=>`<span class="pill ${warn?"p-canc":"p-done"}" style="margin:1px 0;display:inline-block">${toHHMM(f)}–${toHHMM(t)}</span>`).join("<br>")}<div class="muted" style="font-size:10px">${s.hours}h${warn?" ⚠":""}</div></td>`;
     }).join("");
     return `<tr><td class="name">${DAY_GR[d]}<div class="muted mono" style="font-size:10.5px">${hoursLabel(hrs[d])}</div></td>${cells}</tr>`;
   }).join("");
-  box.innerHTML=`<table><thead><tr><th>Ημέρα</th>${emps.map(e=>`<th style="text-align:center">${esc(e.name)}${e.role?`<div class="muted" style="font-weight:400">${esc(e.role)}</div>`:""}</th>`).join("")}</tr></thead>
+  box.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2)">
+      <button class="btn ghost sm" id="shPrev">◀</button>
+      <b style="font-family:'Noto Serif',serif">Εβδομάδα: ${rng.label}</b>
+      <button class="btn ghost sm" id="shNext">▶</button>
+      <button class="btn ghost sm" id="shThis">Τρέχουσα</button>
+    </div>
+    ${warns.length?`<div class="flag warn" style="margin:10px 14px"><span>⚠</span><span>${warns.map(esc).join("<br>")}</span></div>`:""}
+    <table><thead><tr><th>Ημέρα</th>${data.map(x=>`<th style="text-align:center">${esc(x.e.name)}${x.e.role?`<div class="muted" style="font-weight:400">${esc(x.e.role)}</div>`:""}${x.weekly?`<div class="muted" style="font-weight:400;font-size:10.5px">στόχος ${x.weekly}h</div>`:""}</th>`).join("")}</tr></thead>
     <tbody>${body}
-    <tr style="background:#FAFBFA"><td class="name">Σύνολο ωρών</td>${emps.map(e=>`<td class="mono" style="text-align:center;font-weight:600">${totalH[e.id].toFixed(1)}h</td>`).join("")}</tr>
+    <tr style="background:#FAFBFA"><td class="name">Σύνολο ωρών</td>${data.map(x=>`<td class="mono" style="text-align:center;font-weight:600;color:${x.over||x.overWeek?"#A83A2C":"inherit"}">${x.total.toFixed(1)}h${x.weekly?` / ${x.weekly}`:""}</td>`).join("")}</tr>
     </tbody></table>`;
+  $("#shPrev").onclick=()=>{ const s=shiftWeekStart(); shiftWeek=new Date(s.getFullYear(),s.getMonth(),s.getDate()-7); renderShift(); };
+  $("#shNext").onclick=()=>{ const s=shiftWeekStart(); shiftWeek=new Date(s.getFullYear(),s.getMonth(),s.getDate()+7); renderShift(); };
+  $("#shThis").onclick=()=>{ shiftWeek=mondayOf(new Date()); renderShift(); };
 }
 function sheetShift(){
-  const {hrs,emps}=shiftData();
+  const {hrs,emps,data}=shiftCompute();
   const rows=[["Ημέρα","Ωράριο"].concat(emps.map(e=>e.name+(e.role?` (${e.role})`:"")))];
-  const totals={}; emps.forEach(e=>totals[e.id]=0);
   DAYS.forEach(d=>{
-    if(hrs[d].closed){ rows.push([DAY_GR[d],"Κλειστά"].concat(emps.map(()=>"—"))); return; }
-    rows.push([DAY_GR[d],hoursLabel(hrs[d])].concat(emps.map(e=>{ const s=empShift(e,d,hrs); if(!s) return "—"; totals[e.id]+=s.hours; return s.label; })));
+    if(hrs[d].closed){ rows.push([DAY_GR[d],"Κλειστά"].concat(emps.map(()=>"ΡΕΠΟ"))); return; }
+    rows.push([DAY_GR[d],hoursLabel(hrs[d])].concat(data.map(x=>{ const s=x.days[d]; return s?s.label:"ΡΕΠΟ"; })));
   });
-  rows.push(["Σύνολο ωρών",""].concat(emps.map(e=>totals[e.id].toFixed(1)+"h")));
+  rows.push(["Σύνολο ωρών",""].concat(data.map(x=>x.total.toFixed(1)+"h"+(x.weekly?` / ${x.weekly}`:""))));
   return {name:"Πρόγραμμα εργασίας",widths:[14,20].concat(emps.map(()=>20)),rows};
 }
 
@@ -2932,14 +2995,27 @@ function bind(){
 
   document.addEventListener("click",async e=>{
     if(!e.target.closest(".field")) clearSug();
-    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-empdel]");
+    const b=e.target.closest("button[data-fill],button[data-open],button[data-mail],button[data-done],button[data-canc],button[data-del],button[data-edit],button[data-delc],button[data-book],button[data-delh],button[data-expc],button[data-paid],button[data-svcdel],button[data-pwedit],button[data-pwdel],button[data-uexp],button[data-utoggle],button[data-reqdel],button[data-reqcv],button[data-reqok],button[data-reqno],button[data-reqfin],button[data-cvint],button[data-cvpick],button[data-cvrej],button[data-empdel]");
     if(!b) return;
     const d=b.dataset;
 
     if(d.cvint){
       const [rid,cid]=d.cvint.split(":"); const r=DB.staffReq.find(x=>x.id===rid);
       const cv=r&&(r.cvs||[]).find(c=>c.id===cid);
-      if(cv){ cv.interview=!cv.interview; await persist(); }
+      if(cv){ cv.interview=!cv.interview; if(cv.interview) cv.rejected=false; await persist(); }
+      return;
+    }
+    if(d.cvrej){
+      const [rid,cid]=d.cvrej.split(":"); const r=DB.staffReq.find(x=>x.id===rid);
+      const cv=r&&(r.cvs||[]).find(c=>c.id===cid);
+      if(cv){
+        cv.rejected=!cv.rejected;
+        if(cv.rejected){ cv.interview=false; if(cv.chosen){ cv.chosen=false; r.finalPicked=(r.cvs||[]).some(c=>c.chosen); } 
+          notify(ADMIN_BOX,`Ο χρήστης ${r.ownerLabel||ownerName(r.owner)} απέρριψε ένα βιογραφικό για «${r.position}» (δεν τον ενδιαφέρει).`);
+          logIt(`Απόρριψη βιογραφικού για «${r.position}»`,"sys","");
+        }
+        await persist();
+      }
       return;
     }
     if(d.cvpick){
