@@ -29,7 +29,9 @@
   .brand img{width:52px;height:52px;flex:0 0 52px;background:#fff;border-radius:50%;padding:2px}
   .brand h1{font-family:"Noto Serif",Georgia,serif;font-size:18px;font-weight:700;line-height:1.25}
   .brand p{color:#9DB3BB;font-size:11px;letter-spacing:.9px;text-transform:uppercase;margin-top:3px}
-  .head-meta{text-align:right;font-size:11.5px;color:#9DB3BB}
+  .head-meta{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;text-align:right;font-size:11.5px;color:#9DB3BB}
+  #impChip,#dlChip{font-weight:600;color:#CDE3D4;border-color:#3C6F52}
+  #impChip:hover,#dlChip:hover{background:#1a3b2b}
   #bellChip{position:relative;font-size:15px;padding:6px 9px}
   .bellbadge{display:none;position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:9px;background:#D64533;color:#fff;font-size:10px;font-weight:700;line-height:17px;text-align:center;padding:0 4px}
   .bellbadge.on{display:block}
@@ -268,6 +270,8 @@
     </div>
     <div class="head-meta">
       <strong id="todayLabel">—</strong>
+      <button class="chip" id="impChip" title="Εισαγωγή αντιγράφου ασφαλείας (.json)">⬆ Εισαγωγή</button>
+      <button class="chip" id="dlChip" title="Λήψη αντιγράφου ασφαλείας (.json)">⬇ Λήψη</button>
       <button class="chip" id="bellChip" title="Ειδοποιήσεις"><span id="bellIco">🔔</span><span id="bellBadge" class="bellbadge"></span></button>
       <button class="chip" id="logoutChip" title="Αποσύνδεση">⎋ Έξοδος</button>
       <button class="chip" id="syncChip"><i></i><span id="syncTxt">Φόρτωση…</span></button>
@@ -637,7 +641,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.8 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.0 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1552,8 +1556,8 @@ function queueSync(){ if(!syncOn) return; clearTimeout(syncTimer); syncTimer=set
 
 /* Ανάκτηση από αρχείο: δέχεται κρυπτογραφημένο φάκελο ή παλιό απλό JSON */
 async function restoreFrom(raw){
-  if(raw&&Array.isArray(raw.clients)) return raw;                 // παλαιά μορφή
-  if(raw&&raw.v===2){
+  if(raw&&Array.isArray(raw.clients)) return raw;                 // παλαιά μη κρυπτογραφημένη μορφή
+  if(raw&&(raw.v===2||raw.v===3)){                               // κρυπτογραφημένο αντίγραφο (v2 ή v3)
     let r=await openEnvelope(raw,sessionPw);
     if(!r){
       const pw=prompt("Το αρχείο είναι κρυπτογραφημένο με άλλον κωδικό. Δώστε τον κωδικό του αρχείου:");
@@ -3430,6 +3434,42 @@ async function unlockApp(pw){
 }
 
 /* ---------- 7f. ONBOARDING (πρώτη φορά) ---------- */
+/* Οθόνη υποδοχής σε νέα συσκευή: εισαγωγή αντιγράφου ή ρύθμιση από την αρχή.
+   Εμφανίζεται ΜΟΝΟ μετά τον σωστό κωδικό, οπότε η προστασία διατηρείται. */
+function importBackupFile(){
+  const inp=document.createElement("input");
+  inp.type="file"; inp.accept="application/json,.json";
+  inp.onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=async()=>{
+      try{
+        const d=await restoreFrom(JSON.parse(r.result));
+        if(!d||!Array.isArray(d.clients)) throw new Error("bad");
+        DB=norm(d); await persist(); closeModal();
+        toast("Το αντίγραφο φορτώθηκε — καλωσήρθατε πίσω.");
+      }catch(err){ toast("Μη έγκυρο ή μη αποκρυπτογραφήσιμο αρχείο (ελέγξτε ότι είναι το σωστό .json).",true); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function showWelcome(){
+  $("#modal").className="modal";
+  $("#modal").innerHTML=`
+    <div class="modal-h"><div><h3>Καλωσήρθατε${currentUser&&currentUser.label?`, ${esc(currentUser.label)}`:""}</h3><div class="muted">Δεν βρέθηκαν δεδομένα σε αυτή τη συσκευή</div></div></div>
+    <div class="modal-b">
+      <p>Αυτή η συσκευή δεν έχει ακόμη δεδομένα για τον λογαριασμό σας. Ο κωδικός σας αναγνωρίστηκε — επιλέξτε πώς θέλετε να συνεχίσετε:</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+        <button class="btn brass" id="wImport">📥 Έχω αντίγραφο ασφαλείας — Εισαγωγή τώρα</button>
+        <button class="btn ghost" id="wNew">🆕 Ξεκινώ νέα επιχείρηση — Ρύθμιση από την αρχή</button>
+      </div>
+      <p class="muted" style="margin-top:14px;font-size:12.5px">Αν δουλεύατε σε άλλη συσκευή: από εκείνη, στα «Δεδομένα &amp; Excel», κατεβάστε το αντίγραφο ασφαλείας (<span class="mono">.json</span>) και κάντε το εισαγωγή εδώ. Θα επανέλθουν <b>επιχείρηση, υπηρεσίες και πελάτες</b> — δεν χρειάζεται να ξαναπεράσετε στοιχεία.</p>
+    </div>`;
+  $("#back").classList.add("on");
+  $("#wImport").onclick=importBackupFile;
+  $("#wNew").onclick=()=>{ closeModal(); showOnboarding(); };
+}
 function showOnboarding(){
   let step=1, chosen=prof().type||"";
   const render=()=>{
@@ -3544,6 +3584,8 @@ function bind(){
   $("#notifChip").onclick=askNotif;
   $("#bellChip").onclick=openBell;
   $("#logoutChip").onclick=()=>{ if(confirm("Αποσύνδεση από το πρόγραμμα;")){ try{ sessionPw=null; dekKey=null; dekRaw=null; currentUser=null; }catch(e){} location.reload(); } };
+  $("#dlChip").onclick=async()=>{ try{ download(`${FOLDER}_backup_${todayISO()}.json`,new Blob([JSON.stringify(await envelope(),null,2)],{type:"application/json"})); toast("Το αντίγραφο ασφαλείας κατέβηκε."); }catch(e){ toast("Σφάλμα λήψης.",true); } };
+  $("#impChip").onclick=importBackupFile;
   $("#fMic").onclick=toggleMic;
   $("#fMail").onclick=()=>{
     const name=$("#fName").value.trim(), email=$("#fEmail").value.trim(), phone=$("#fPhone").value.trim();
@@ -3861,8 +3903,10 @@ async function startApp(){
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden) reloadFromStore(); });
 
   if(!prof().setup){
-    setTimeout(showOnboarding,300);   // πρώτη φορά: ρύθμιση επιχείρησης
-    return;
+    // Χωρίς ερωτήσεις: μπαίνει κατευθείαν. Η ρύθμιση επιχείρησης είναι προαιρετική
+    // από «Δεδομένα & Excel», και η εισαγωγή αντιγράφου γίνεται από το ⬆ πάνω δεξιά.
+    DB.profile.setup=true;
+    try{ await Store.saveRaw(await envelope()); }catch(e){}
   }
   if(FS_OK){
     if(!dirHandle) setTimeout(()=>showSetup(false),350);
