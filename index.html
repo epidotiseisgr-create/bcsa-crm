@@ -69,6 +69,10 @@
   input:focus,textarea:focus,select:focus{outline:2px solid var(--brass);outline-offset:-1px;border-color:var(--brass);background:#fff}
   textarea{resize:vertical;min-height:64px}
   .field{margin-bottom:13px;position:relative}
+  .pwwrap{position:relative;display:block}
+  .pwwrap input{width:100%;padding-right:40px}
+  .pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:var(--muted);opacity:.8}
+  .pweye:hover{opacity:1}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
   .req{color:var(--brass)}
 
@@ -633,7 +637,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.6 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v5.7 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -2124,13 +2128,14 @@ function renderPwAdmin(){
     <div style="border-top:1px solid var(--line-2);margin-top:14px;padding-top:14px">
       <div class="sec-t">Προσθήκη νέου κωδικού</div>
       <div class="two"><div class="field" style="margin:0"><label>Ετικέτα (π.χ. υποκατάστημα)</label><input id="npLabel" placeholder="π.χ. Καβάλα"></div>
-        <div class="field" style="margin:0"><label>Κωδικός</label><input id="npPass" placeholder="κωδικός εισόδου"></div></div>
+        <div class="field" style="margin:0"><label>Κωδικός</label>${pwField("npPass","κωδικός εισόδου")}</div></div>
       <div class="two" style="margin-top:11px;align-items:end">
         <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="npUntil" type="date"></div>
         <button class="btn brass" id="npAdd">Προσθήκη κωδικού</button>
       </div>
     </div>
     <p class="muted" style="margin-top:10px">Οι κωδικοί κρυπτογραφούνται και ξεκλειδώνουν την ίδια βάση. Ο νέος χρήστης βλέπει <b>μόνο τα δικά του</b> δεδομένα· ο διαχειριστής έχει πρόσβαση σε όλα από την «Εποπτεία χρηστών».</p>`;
+  wirePwEyes(box);
   $("#npAdd").onclick=async()=>{
     const label=$("#npLabel").value.trim()||"Χρήστης", pass=$("#npPass").value.trim(), until=$("#npUntil").value||null;
     if(pass.length<4){ toast("Κωδικός τουλάχιστον 4 χαρακτήρων.",true); return; }
@@ -2151,13 +2156,14 @@ function pwEditDialog(id){
     <div class="modal-h"><div><h3>Αλλαγή κωδικού</h3><div class="muted">${esc(w.label||w.id)}</div></div><button class="btn ghost sm" id="peX">✕</button></div>
     <div class="modal-b">
       <div class="field" style="margin:0"><label>Ετικέτα</label><input id="peLabel" value="${esc(w.label||"")}"></div>
-      <div class="field" style="margin:0"><label>Νέος κωδικός (κενό = χωρίς αλλαγή)</label><input id="pePass" placeholder="••••••••"></div>
+      <div class="field" style="margin:0"><label>Νέος κωδικός (κενό = χωρίς αλλαγή)</label>${pwField("pePass","••••••••")}</div>
       <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="peUntil" type="date" value="${w.until||""}"></div>
       <div id="peErr"></div>
       <div class="row-end"><button class="btn ghost" id="peCancel">Άκυρο</button><button class="btn brass" id="peSave">Αποθήκευση</button></div>
     </div>`;
   $("#back").classList.add("on");
   $("#peX").onclick=closeModal; $("#peCancel").onclick=closeModal;
+  wirePwEyes($("#modal"));
   $("#peSave").onclick=async()=>{
     const label=$("#peLabel").value.trim()||w.label, until=$("#peUntil").value||null, pass=$("#pePass").value.trim();
     w.label=label; w.until=until;
@@ -3065,6 +3071,22 @@ function openClient(id){
   $("#mClose").onclick=closeModal;
 }
 function closeModal(){ $("#back").classList.remove("on"); }
+/* Πεδίο κωδικού με «ματάκι» (εμφάνιση/απόκρυψη). Κρυμμένος ως προεπιλογή. */
+function pwField(id,ph){
+  return `<div class="pwwrap"><input id="${id}" type="password" placeholder="${esc(ph||"")}" autocomplete="new-password"><button type="button" class="pweye" data-pweye="${id}" title="Εμφάνιση/απόκρυψη κωδικού" aria-label="Εμφάνιση κωδικού">👁</button></div>`;
+}
+function wirePwEyes(root){
+  (root||document).querySelectorAll("[data-pweye]").forEach(btn=>{
+    btn.onclick=()=>{
+      const inp=document.getElementById(btn.dataset.pweye); if(!inp) return;
+      const show=inp.type==="password";
+      inp.type=show?"text":"password";
+      btn.textContent=show?"🙈":"👁";
+      btn.title=show?"Απόκρυψη κωδικού":"Εμφάνιση κωδικού";
+      inp.focus();
+    };
+  });
+}
 function openEmpInfo(id){
   const fi=(window._freeInfo||{})[id]; const e=DB.employees.find(x=>x.id===id); if(!e) return;
   const spots=(fi&&fi.spots)||[];
