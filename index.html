@@ -238,6 +238,19 @@
 
   footer{border-top:1px solid var(--line);padding:18px 24px;text-align:center;color:var(--ink-3);font-size:11.5px}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* --- Γραφιστικά --- */
+  .gxopts{display:flex;flex-wrap:wrap;gap:8px}
+  .gxopt{appearance:none;font:inherit;font-size:12.5px;cursor:pointer;padding:8px 12px;border:1px solid var(--line);background:#FCFDFC;color:var(--ink-2);border-radius:var(--radius);text-align:left;line-height:1.3}
+  .gxopt:hover{border-color:var(--brass);background:var(--brass-soft)}
+  .gxopt.on{border-color:var(--brass);background:var(--brass-soft);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--brass)}
+  .gxopt b{display:block;font-size:12.5px}
+  .gxopt span{display:block;font-size:11px;color:var(--ink-3);font-weight:400;margin-top:2px}
+  .gxprev{background:var(--line-2);padding:14px;border-radius:var(--radius);text-align:center}
+  .gxprev canvas{max-width:100%;height:auto;box-shadow:0 2px 18px -6px rgba(16,36,43,.45);background:#fff;border:1px solid var(--line)}
+  .gxrow{display:flex;gap:12px;flex-wrap:wrap}
+  .gxrow>*{flex:1 1 150px}
+  .gxnote{font-size:11.5px;color:var(--ink-3);margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -288,6 +301,7 @@
     <button class="tab" data-view="week">Εβδομαδιαίο</button>
     <button class="tab" data-view="month">Μηνιαίο</button>
     <button class="tab" data-view="staff">Προσωπικό <span class="n" id="nStaff"></span></button>
+    <button class="tab" data-view="graphics">Γραφιστικά</button>
     <button class="tab" data-view="data">Δεδομένα &amp; Excel</button>
   </div>
 </nav>
@@ -582,6 +596,74 @@
     </div>
   </section>
 
+  <!-- ΓΡΑΦΙΣΤΙΚΑ -->
+  <section class="view" id="v-graphics">
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-h"><h2>Δημιουργία ανακοίνωσης</h2><span class="sub">Αργίες &amp; ειδοποιήσεις</span></div>
+        <div class="panel-b">
+          <div class="field">
+            <label for="gxOcc">Περίσταση</label>
+            <select id="gxOcc"></select>
+          </div>
+          <div class="field">
+            <label>Γραφιστική εναλλακτική</label>
+            <div class="gxopts" id="gxThemes"></div>
+          </div>
+          <div class="field">
+            <label for="gxTitle">Τίτλος (έντονα &amp; υπογραμμισμένα)</label>
+            <input id="gxTitle" value="ΑΝΑΚΟΙΝΩΣΗ" maxlength="40">
+          </div>
+          <div class="gxrow">
+            <div class="field"><label for="gxFrom">Από (προαιρετικό)</label><input type="date" id="gxFrom"></div>
+            <div class="field"><label for="gxTo">Έως (προαιρετικό)</label><input type="date" id="gxTo"></div>
+          </div>
+          <div class="field">
+            <label for="gxBody">Κείμενο ανακοίνωσης</label>
+            <textarea id="gxBody" style="min-height:130px" placeholder="Γράψτε ελεύθερα το κείμενο ή πατήστε «Πρόταση κειμένου»."></textarea>
+            <div class="row-end" style="justify-content:flex-start;margin-top:8px">
+              <button class="btn ghost" id="gxSuggest">✍ Πρόταση κειμένου</button>
+              <button class="btn ghost" id="gxClearTxt">Καθαρισμός</button>
+            </div>
+            <div class="gxnote">Οι κωδικές λέξεις <b>{ΑΠΟ}</b> και <b>{ΕΩΣ}</b> αντικαθίστανται αυτόματα από τις ημερομηνίες.</div>
+          </div>
+          <div class="gxrow">
+            <div class="field"><label for="gxSign">Υπογραφή / Επωνυμία</label><input id="gxSign" placeholder="π.χ. Η Διεύθυνση"></div>
+            <div class="field"><label for="gxPhone">Τηλέφωνο (προαιρετικό)</label><input id="gxPhone" placeholder="π.χ. 2410 000000"></div>
+          </div>
+          <div class="field">
+            <label>Λογότυπο</label>
+            <div class="gxopts" id="gxLogoMode">
+              <button class="gxopt on" data-lmode="biz">Της επιχείρησης</button>
+              <button class="gxopt" data-lmode="file">Ανέβασμα αρχείου</button>
+              <button class="gxopt" data-lmode="url">Σύνδεσμος (URL)</button>
+              <button class="gxopt" data-lmode="none">Χωρίς λογότυπο</button>
+            </div>
+            <div id="gxLogoFileBox" style="display:none;margin-top:10px"><input type="file" id="gxLogoFile" accept="image/*"></div>
+            <div id="gxLogoUrlBox" style="display:none;margin-top:10px"><input id="gxLogoUrl" placeholder="https://…/logo.png"><div class="row-end" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost" id="gxLogoUrlGo">Φόρτωση εικόνας</button></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <h2>Προεπισκόπηση — A4 οριζόντιο</h2>
+          <span class="sub" id="gxSizeLbl">1754 × 1240 px · 150 dpi</span>
+        </div>
+        <div class="panel-b">
+          <div class="gxprev"><canvas id="gxCv" width="1754" height="1240"></canvas></div>
+          <div class="row-end" style="justify-content:flex-start;margin-top:14px;flex-wrap:wrap;gap:8px">
+            <button class="btn brass" id="gxPng">🖼 Λήψη PNG</button>
+            <button class="btn" id="gxJpg">📷 Λήψη JPG</button>
+            <button class="btn" id="gxPdf">📄 Λήψη PDF</button>
+            <button class="btn ghost" id="gxRedraw">↻ Ανανέωση</button>
+          </div>
+          <div class="gxnote" id="gxWarn"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="view" id="v-data">
     <div class="panel" style="margin-bottom:22px" id="admRptPanel">
       <div class="panel-h"><h2>Αναφορές προβλημάτων</h2><span class="sub">Από τους χρήστες</span></div>
@@ -641,7 +723,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.0 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.1 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -3562,12 +3644,522 @@ function resizeLogo(dataUrl,cb){
   img.src=dataUrl;
 }
 
+/* ---------- 7d. ΓΡΑΦΙΣΤΙΚΑ (ανακοινώσεις αργιών) ---------- */
+/* Καμβάς A4 οριζόντιο στα 150 dpi = 1754 × 1240 px (ταιριάζει με jpegPdf). */
+const GX_W=1754, GX_H=1240;
+/* Ασφαλής ζώνη κειμένου — τα διακοσμητικά ΔΕΝ μπαίνουν ποτέ εδώ μέσα. */
+const GX_SAFE={x:225,y:118,w:GX_W-450,h:GX_H-118-268};
+
+const gfxState={occ:"xmas",theme:0,tvar:0,logoMode:"biz",logoSrc:"",tainted:false,inited:false};
+
+/* ---- σχεδιαστικά primitives ---- */
+function gxRR(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+function gxFrame(x,c,inset,w){ x.strokeStyle=c; x.lineWidth=w; x.strokeRect(inset,inset,GX_W-inset*2,GX_H-inset*2); }
+function gxStar(x,cx,cy,r,c,pts){ pts=pts||5; x.beginPath(); for(let i=0;i<pts*2;i++){ const rr=i%2?r*0.44:r, a=Math.PI/pts*i-Math.PI/2; x.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr); } x.closePath(); x.fillStyle=c; x.fill(); }
+function gxFlake(x,cx,cy,r,c,w){ x.save(); x.strokeStyle=c; x.lineWidth=w||3; x.lineCap="round"; for(let i=0;i<6;i++){ const a=Math.PI/3*i; x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); x.stroke(); x.beginPath(); x.moveTo(cx+Math.cos(a)*r*0.6,cy+Math.sin(a)*r*0.6); x.lineTo(cx+Math.cos(a)*r*0.6+Math.cos(a+0.7)*r*0.3,cy+Math.sin(a)*r*0.6+Math.sin(a+0.7)*r*0.3); x.stroke(); x.beginPath(); x.moveTo(cx+Math.cos(a)*r*0.6,cy+Math.sin(a)*r*0.6); x.lineTo(cx+Math.cos(a)*r*0.6+Math.cos(a-0.7)*r*0.3,cy+Math.sin(a)*r*0.6+Math.sin(a-0.7)*r*0.3); x.stroke(); } x.restore(); }
+function gxTree(x,cx,by,h,c,trunk){ const w=h*0.52; x.fillStyle=trunk||"#6B4A2A"; x.fillRect(cx-h*0.045,by-h*0.13,h*0.09,h*0.13); x.fillStyle=c; for(let i=0;i<3;i++){ const t=by-h*0.12-i*h*0.26, ww=w*(1-i*0.22), hh=h*0.4; x.beginPath(); x.moveTo(cx,t-hh); x.lineTo(cx+ww/2,t); x.lineTo(cx-ww/2,t); x.closePath(); x.fill(); } }
+function gxEgg(x,cx,cy,r,c1,c2,style){ x.save(); x.beginPath(); x.ellipse(cx,cy,r*0.76,r,0,0,7); x.closePath(); x.fillStyle=c1; x.fill(); if(style==="stripe"){ x.clip(); x.strokeStyle=c2; x.lineWidth=r*0.16; for(let i=-2;i<=3;i++){ x.beginPath(); x.moveTo(cx-r,cy+i*r*0.42); x.lineTo(cx+r,cy+i*r*0.42-r*0.3); x.stroke(); } } else if(style==="dot"){ x.clip(); x.fillStyle=c2; for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) { x.beginPath(); x.arc(cx+i*r*0.42,cy+j*r*0.5,r*0.13,0,7); x.fill(); } } else if(style==="zig"){ x.clip(); x.strokeStyle=c2; x.lineWidth=r*0.13; for(let j=-2;j<=2;j++){ x.beginPath(); for(let k=-3;k<=3;k++) x.lineTo(cx+k*r*0.26,cy+j*r*0.5+(k%2?r*0.14:-r*0.14)); x.stroke(); } } x.restore(); x.save(); x.beginPath(); x.ellipse(cx,cy,r*0.76,r,0,0,7); x.closePath(); x.strokeStyle="rgba(0,0,0,.13)"; x.lineWidth=2; x.stroke(); x.restore(); }
+function gxCandle(x,cx,by,h,c,flame){ x.fillStyle=c; x.fillRect(cx-h*0.055,by-h,h*0.11,h); x.fillStyle="rgba(0,0,0,.10)"; x.fillRect(cx-h*0.055,by-h*0.34,h*0.11,4); x.beginPath(); x.moveTo(cx,by-h-h*0.16); x.quadraticCurveTo(cx+h*0.055,by-h-h*0.05,cx,by-h); x.quadraticCurveTo(cx-h*0.055,by-h-h*0.05,cx,by-h-h*0.16); x.closePath(); x.fillStyle=flame||"#E8A62B"; x.fill(); }
+function gxLaurel(x,cx,cy,r,c,dir){
+  x.save(); x.translate(cx,cy); x.rotate(dir||0);
+  const c1x=r*0.55,c1y=-r*0.06,ex=r,ey=-r*0.40;
+  x.strokeStyle=c; x.lineWidth=Math.max(2.5,r*0.042); x.lineCap="round";
+  x.beginPath(); x.moveTo(0,0); x.quadraticCurveTo(c1x,c1y,ex,ey); x.stroke();
+  const N=6;
+  for(let i=1;i<=N;i++){
+    const t=i/(N+0.5);
+    const px=2*(1-t)*t*c1x+t*t*ex, py=2*(1-t)*t*c1y+t*t*ey;
+    const tx=2*(1-t)*c1x+2*t*(ex-c1x), ty=2*(1-t)*c1y+2*t*(ey-c1y);
+    const ang=Math.atan2(ty,tx), L=r*0.34*(1-t*0.3);
+    [1,-1].forEach(sg=>{ x.save(); x.translate(px,py); x.rotate(ang+sg*0.7);
+      x.beginPath(); x.ellipse(L*0.52,0,L*0.52,L*0.21,0,0,7); x.fillStyle=c; x.fill(); x.restore(); });
+  }
+  x.restore(); }
+function gxWaves(x,y,c,amp,n,alpha){ x.save(); x.globalAlpha=alpha==null?1:alpha; x.strokeStyle=c; x.lineWidth=5; for(let k=0;k<(n||3);k++){ x.beginPath(); for(let i=0;i<=GX_W;i+=8) x.lineTo(i,y+k*26+Math.sin(i/64+k)*amp); x.stroke(); } x.restore(); }
+function gxSun(x,cx,cy,r,c){ x.fillStyle=c; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill(); x.strokeStyle=c; x.lineWidth=6; x.lineCap="round"; for(let i=0;i<12;i++){ const a=Math.PI/6*i; x.beginPath(); x.moveTo(cx+Math.cos(a)*r*1.28,cy+Math.sin(a)*r*1.28); x.lineTo(cx+Math.cos(a)*r*1.62,cy+Math.sin(a)*r*1.62); x.stroke(); } }
+function gxPalm(x,cx,by,h,c){ x.strokeStyle=c; x.lineWidth=h*0.055; x.lineCap="round"; x.beginPath(); x.moveTo(cx,by); x.quadraticCurveTo(cx-h*0.1,by-h*0.55,cx-h*0.05,by-h); x.stroke(); x.fillStyle=c; for(let i=0;i<6;i++){ const a=-Math.PI/2+(i-2.5)*0.46; x.save(); x.translate(cx-h*0.05,by-h); x.rotate(a); x.beginPath(); x.ellipse(h*0.3,0,h*0.32,h*0.085,0,0,7); x.fill(); x.restore(); } }
+function gxUmbrella(x,cx,by,h,c1,c2){ x.strokeStyle="#8B6B45"; x.lineWidth=h*0.05; x.beginPath(); x.moveTo(cx,by); x.lineTo(cx,by-h*0.75); x.stroke(); for(let i=0;i<6;i++){ x.beginPath(); x.moveTo(cx,by-h*0.75); x.arc(cx,by-h*0.75,h*0.55,Math.PI+i*Math.PI/6,Math.PI+(i+1)*Math.PI/6); x.closePath(); x.fillStyle=i%2?c1:c2; x.fill(); } }
+function gxShell(x,cx,cy,r,c){ x.save(); x.fillStyle=c; x.beginPath(); x.arc(cx,cy+r*0.4,r,Math.PI,0); x.closePath(); x.fill(); x.strokeStyle="rgba(255,255,255,.55)"; x.lineWidth=2; for(let i=1;i<5;i++){ x.beginPath(); x.moveTo(cx,cy+r*0.4); x.lineTo(cx-r+i*r*0.4,cy-r*0.5); x.stroke(); } x.restore(); }
+function gxKite(x,cx,cy,s,c1,c2,ang){ x.save(); x.translate(cx,cy); x.rotate(ang||0); x.beginPath(); x.moveTo(0,-s); x.lineTo(s*0.7,0); x.lineTo(0,s); x.lineTo(-s*0.7,0); x.closePath(); x.fillStyle=c1; x.fill(); x.beginPath(); x.moveTo(0,-s); x.lineTo(s*0.7,0); x.lineTo(0,0); x.closePath(); x.fillStyle=c2; x.fill(); x.beginPath(); x.moveTo(0,s); x.lineTo(0,s*0.55); x.strokeStyle="#6B7A80"; x.lineWidth=2.5; x.beginPath(); x.moveTo(0,s); x.quadraticCurveTo(s*0.4,s*1.5,0,s*2.1); x.stroke(); x.restore(); }
+function gxFlower(x,cx,cy,r,c,cc){ x.fillStyle=c; for(let i=0;i<6;i++){ const a=Math.PI/3*i; x.save(); x.translate(cx,cy); x.rotate(a); x.beginPath(); x.ellipse(0,-r*0.72,r*0.34,r*0.66,0,0,7); x.fill(); x.restore(); } x.fillStyle=cc||"#E8B33A"; x.beginPath(); x.arc(cx,cy,r*0.34,0,7); x.fill(); }
+function gxGear(x,cx,cy,r,c){ x.save(); x.fillStyle=c; x.beginPath(); for(let i=0;i<12;i++){ const a=Math.PI/6*i, rr=i%2?r:r*1.28; for(let k=0;k<2;k++) x.lineTo(cx+Math.cos(a+k*0.13)*rr,cy+Math.sin(a+k*0.13)*rr); } x.closePath(); x.fill(); x.globalCompositeOperation="destination-out"; x.beginPath(); x.arc(cx,cy,r*0.42,0,7); x.fill(); x.restore(); }
+function gxTape(x,y,h,c1,c2){ x.save(); x.fillStyle=c1; x.fillRect(0,y,GX_W,h); x.fillStyle=c2; x.beginPath(); for(let i=-h;i<GX_W+h;i+=h*1.5){ x.moveTo(i,y+h); x.lineTo(i+h*0.75,y); x.lineTo(i+h*1.5,y); x.lineTo(i+h*0.75,y+h); } x.fill(); x.restore(); }
+function gxCone(x,cx,by,h,c){ x.fillStyle="#3A3A3A"; gxRR(x,cx-h*0.42,by-h*0.09,h*0.84,h*0.09,3); x.fill(); x.fillStyle=c; x.beginPath(); x.moveTo(cx,by-h); x.lineTo(cx+h*0.3,by-h*0.09); x.lineTo(cx-h*0.3,by-h*0.09); x.closePath(); x.fill(); x.fillStyle="#fff"; x.fillRect(cx-h*0.19,by-h*0.5,h*0.38,h*0.11); }
+function gxBox(x,cx,by,w,c1,c2){ const h=w*0.72; x.fillStyle=c1; x.fillRect(cx-w/2,by-h,w,h); x.fillStyle=c2; x.fillRect(cx-w/2,by-h,w,h*0.2); x.strokeStyle="rgba(0,0,0,.18)"; x.lineWidth=2; x.strokeRect(cx-w/2,by-h,w,h); x.beginPath(); x.moveTo(cx,by-h); x.lineTo(cx,by); x.stroke(); }
+function gxClock(x,cx,cy,r,c){ x.strokeStyle=c; x.lineWidth=5; x.beginPath(); x.arc(cx,cy,r,0,7); x.stroke(); x.lineWidth=4; x.lineCap="round"; x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx,cy-r*0.58); x.stroke(); x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+r*0.42,cy+r*0.2); x.stroke(); for(let i=0;i<12;i++){ const a=Math.PI/6*i; x.beginPath(); x.lineWidth=3; x.moveTo(cx+Math.cos(a)*r*0.86,cy+Math.sin(a)*r*0.86); x.lineTo(cx+Math.cos(a)*r*0.96,cy+Math.sin(a)*r*0.96); x.stroke(); } }
+function gxConfetti(x,pal,seed){ let s=seed||7; const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+  for(let i=0;i<170;i++){ const px=rnd()*GX_W, py=rnd()*GX_H;
+    if(px>GX_SAFE.x-40&&px<GX_SAFE.x+GX_SAFE.w+40&&py>GX_SAFE.y-40&&py<GX_SAFE.y+GX_SAFE.h+40) continue;
+    x.save(); x.translate(px,py); x.rotate(rnd()*6.3); x.fillStyle=pal[Math.floor(rnd()*pal.length)]; x.globalAlpha=.85; x.fillRect(-6,-3,12,7); x.restore(); } }
+function gxRibbon(x,cx,cy,w,c1,c2){ x.fillStyle=c1; x.fillRect(cx-w/2,cy-14,w,28); x.fillStyle=c2; x.beginPath(); x.moveTo(cx-30,cy); x.lineTo(cx-72,cy-40); x.lineTo(cx-72,cy+40); x.closePath(); x.fill(); x.beginPath(); x.moveTo(cx+30,cy); x.lineTo(cx+72,cy-40); x.lineTo(cx+72,cy+40); x.closePath(); x.fill(); x.fillStyle=c2; x.beginPath(); x.arc(cx,cy,26,0,7); x.fill(); }
+function gxWarnSign(x,cx,cy,s,c,ic){ x.save(); x.fillStyle=c; x.beginPath(); x.moveTo(cx,cy-s); x.lineTo(cx+s*0.92,cy+s*0.64); x.lineTo(cx-s*0.92,cy+s*0.64); x.closePath(); x.fill(); x.fillStyle=ic||"#fff"; x.fillRect(cx-s*0.095,cy-s*0.40,s*0.19,s*0.62); x.beginPath(); x.arc(cx,cy+s*0.44,s*0.115,0,7); x.fill(); x.restore(); }
+function gxCross(x,cx,cy,h,c){ x.fillStyle=c; const t=h*0.2; x.fillRect(cx-t/2,cy-h/2,t,h); x.fillRect(cx-h*0.32,cy-h*0.16,h*0.64,t); }
+
+/* ---- διακοσμητικά θέματα (μόνο περίγραμμα / κάτω ζώνη) ---- */
+const GFX_DECO={
+  plain(x,P){ gxFrame(x,P.ac,42,3); },
+  dbl(x,P){ gxFrame(x,P.ac,38,6); gxFrame(x,P.ac,54,2); },
+  band(x,P){ x.fillStyle=P.ac; x.fillRect(0,0,GX_W,54); x.fillRect(0,GX_H-54,GX_W,54); x.fillStyle=P.ac2||P.ac; x.fillRect(0,54,GX_W,7); x.fillRect(0,GX_H-61,GX_W,7); },
+  corner(x,P){ gxFrame(x,P.ac,44,2.5); x.fillStyle=P.ac; [[44,44,1,1],[GX_W-44,44,-1,1],[44,GX_H-44,1,-1],[GX_W-44,GX_H-44,-1,-1]].forEach(([a,b,sx,sy])=>{ x.beginPath(); x.moveTo(a,b); x.lineTo(a+140*sx,b); x.lineTo(a,b+140*sy); x.closePath(); x.fill(); }); },
+
+  snow(x,P){ gxFrame(x,P.ac,44,2.5); const pts=[[110,140,34],[240,90,22],[GX_W-110,150,32],[GX_W-250,92,22],[80,GX_H/2-60,26],[GX_W-80,GX_H/2+40,26],[150,GX_H-140,30],[GX_W-160,GX_H-135,28],[420,GX_H-96,20],[GX_W-430,GX_H-100,22],[700,GX_H-88,17],[GX_W-720,GX_H-92,18]];
+    pts.forEach(p=>gxFlake(x,p[0],p[1],p[2],P.ac,3)); x.fillStyle=P.ac2||P.ac; for(let i=0;i<40;i++){ const a=(i*137)%GX_W, b=(i%2?70:GX_H-70)+(i*53)%40; x.globalAlpha=.5; x.beginPath(); x.arc(a,b,4,0,7); x.fill(); } x.globalAlpha=1; },
+  trees(x,P){ gxFrame(x,P.ac,44,2.5); x.fillStyle=P.ac3||"#F2F5F3"; x.beginPath(); x.moveTo(0,GX_H); x.lineTo(0,GX_H-120); for(let i=0;i<=GX_W;i+=40) x.lineTo(i,GX_H-120+Math.sin(i/110)*22); x.lineTo(GX_W,GX_H); x.closePath(); x.fill();
+    [[120,150],[250,105],[360,125],[GX_W-130,150],[GX_W-260,108],[GX_W-370,128],[620,88],[GX_W-640,92]].forEach(t=>gxTree(x,t[0],GX_H-52,t[1],P.ac));
+    [[190,26],[300,20],[GX_W-200,26],[GX_W-310,20],[500,17],[GX_W-520,17]].forEach(f=>gxFlake(x,f[0],74,f[1],P.ac2||P.ac,2.5)); },
+  stars(x,P){ gxFrame(x,P.ac,44,3); const S=[[120,120,34],[230,80,20],[340,74,15],[GX_W-120,120,34],[GX_W-235,80,20],[GX_W-345,74,15],[100,GX_H-130,28],[GX_W-105,GX_H-128,28],[300,GX_H-92,18],[GX_W-310,GX_H-95,18],[560,GX_H-80,13],[GX_W-570,GX_H-84,13]];
+    S.forEach(s=>gxStar(x,s[0],s[1],s[2],P.ac)); },
+  conf(x,P){ gxFrame(x,P.ac,44,2.5); gxConfetti(x,[P.ac,P.ac2||P.ac,P.ac3||P.ac],11); },
+  clock(x,P){ gxFrame(x,P.ac,44,3); gxClock(x,128,GX_H-128,66,P.ac); gxClock(x,GX_W-128,128,66,P.ac); gxStar(x,GX_W-140,GX_H-140,30,P.ac2||P.ac); gxStar(x,140,140,30,P.ac2||P.ac); },
+
+  eggsBottom(x,P){ gxFrame(x,P.ac,44,2.5); const c=[P.e1,P.e2,P.e3,P.e4], st=["stripe","dot","zig","stripe"];
+    let i=0; for(let px=125;px<=GX_W-125;px+=138){ gxEgg(x,px,GX_H-96,44,c[i%4],P.bg,st[i%4]); i++; } },
+  eggsBorder(x,P){ gxFrame(x,P.ac,50,2.5); const c=[P.e1,P.e2,P.e3,P.e4], st=["stripe","dot","zig"];
+    let i=0; for(let px=120;px<=GX_W-120;px+=170){ gxEgg(x,px,84,36,c[i%4],P.bg,st[i%3]); gxEgg(x,px,GX_H-84,36,c[(i+2)%4],P.bg,st[(i+1)%3]); i++; }
+    for(let py=250;py<=GX_H-250;py+=180){ gxEgg(x,86,py,34,c[i%4],P.bg,st[i%3]); gxEgg(x,GX_W-86,py,34,c[(i+1)%4],P.bg,st[(i+2)%3]); i++; } },
+  candles(x,P){ gxFrame(x,P.ac,44,2.5); [90,GX_W-90].forEach(cx=>{ gxCandle(x,cx,GX_H-200,300,P.ac2||"#8A1E2B"); });
+    gxLaurel(x,120,GX_H-84,110,P.ac,-0.30); gxLaurel(x,GX_W-120,GX_H-84,110,P.ac,Math.PI+0.30);
+    let i=0; for(let px=330;px<=GX_W-330;px+=180){ gxEgg(x,px,GX_H-86,34,[P.e1,P.e2,P.e3][i%3],P.bg,"dot"); i++; } },
+  laurel(x,P){ gxFrame(x,P.ac,44,2.5); gxLaurel(x,92,92,132,P.ac,Math.PI*0.27); gxLaurel(x,GX_W-92,92,132,P.ac,Math.PI*0.73); gxLaurel(x,92,GX_H-92,132,P.ac,-Math.PI*0.27); gxLaurel(x,GX_W-92,GX_H-92,132,P.ac,Math.PI*1.27);
+    x.fillStyle=P.ac2||P.ac; for(let px=430;px<=GX_W-430;px+=150){ x.beginPath(); x.arc(px,GX_H-80,9,0,7); x.fill(); } },
+
+  waves(x,P){ gxFrame(x,P.ac,44,2.5); gxWaves(x,GX_H-150,P.ac,17,4,.85); gxWaves(x,74,P.ac2||P.ac,13,2,.6); },
+  sunSea(x,P){ x.fillStyle=P.ac3||"#F6EBCF"; x.fillRect(0,0,GX_W,110); gxSun(x,GX_W-118,64,40,P.ac2||"#E8A62B");
+    x.fillStyle=P.ac; x.beginPath(); x.moveTo(0,GX_H); x.lineTo(0,GX_H-108); for(let i=0;i<=GX_W;i+=10) x.lineTo(i,GX_H-108+Math.sin(i/78)*15); x.lineTo(GX_W,GX_H); x.closePath(); x.globalAlpha=.9; x.fill(); x.globalAlpha=1;
+    gxPalm(x,116,GX_H-96,150,P.ac4||"#2C7A5B"); gxPalm(x,GX_W-116,GX_H-96,132,P.ac4||"#2C7A5B"); gxFrame(x,P.ac,44,2.5); },
+  beach(x,P){ x.fillStyle=P.ac3||"#F0E2C0"; x.fillRect(0,GX_H-112,GX_W,112); gxWaves(x,GX_H-136,P.ac,12,2,.75);
+    gxUmbrella(x,158,GX_H-62,180,P.ac,P.ac2||"#fff"); gxUmbrella(x,GX_W-158,GX_H-62,180,P.ac2||"#fff",P.ac);
+    [[430,52],[GX_W-440,50],[700,38],[GX_W-710,40]].forEach(s=>gxShell(x,s[0],GX_H-74,s[1],P.ac4||"#D9A05B"));
+    gxSun(x,128,132,36,P.ac2||"#E8A62B"); gxFrame(x,P.ac,44,2.5); },
+  shells(x,P){ gxFrame(x,P.ac,50,2.5); let i=0; for(let px=130;px<=GX_W-130;px+=175){ gxShell(x,px,80,42,i%2?P.ac:(P.ac2||P.ac)); gxShell(x,px,GX_H-76,42,i%2?(P.ac2||P.ac):P.ac); i++; }
+    for(let py=270;py<=GX_H-270;py+=190){ gxShell(x,84,py,38,P.ac); gxShell(x,GX_W-84,py,38,P.ac2||P.ac); } },
+
+  kites(x,P){ gxFrame(x,P.ac,44,2.5); gxKite(x,150,150,62,P.ac,P.ac2||"#fff",-0.3); gxKite(x,318,40,30,P.ac3||P.ac,"#fff",0.25); gxKite(x,GX_W-150,152,62,P.ac2||P.ac,"#fff",0.32); gxKite(x,GX_W-328,40,30,P.ac,P.ac3||"#fff",-0.22);
+    x.strokeStyle=P.ac; x.lineWidth=3; x.beginPath(); for(let i=0;i<=GX_W;i+=10) x.lineTo(i,GX_H-96+Math.sin(i/70)*16); x.stroke();
+    gxKite(x,240,GX_H-120,40,P.ac3||P.ac,"#fff",0.5); gxKite(x,GX_W-250,GX_H-118,40,P.ac2||P.ac,"#fff",-0.5); },
+  serp(x,P){ gxFrame(x,P.ac,44,2.5); x.lineWidth=7; x.lineCap="round";
+    [[P.ac,40],[P.ac2||P.ac,68],[P.ac3||P.ac,96]].forEach(([c,y0])=>{ x.strokeStyle=c; x.beginPath(); for(let i=0;i<=GX_W;i+=8) x.lineTo(i,y0+Math.sin(i/48+y0)*15); x.stroke(); x.beginPath(); for(let i=0;i<=GX_W;i+=8) x.lineTo(i,GX_H-y0+Math.sin(i/48+y0)*15); x.stroke(); });
+    gxConfetti(x,[P.ac,P.ac2||P.ac,P.ac3||P.ac],23); },
+
+  flagStripes(x,P){ const b="#0D5EAF"; x.fillStyle=b; for(let i=0;i<5;i++){ x.fillRect(0,i*32,168,16); x.fillRect(GX_W-168,i*32,168,16); x.fillRect(0,GX_H-160+i*32,168,16); x.fillRect(GX_W-168,GX_H-160+i*32,168,16); }
+    x.fillStyle=b; x.fillRect(0,GX_H-52,GX_W,10); x.fillRect(0,42,GX_W,10); gxFrame(x,b,64,2); gxCross(x,GX_W/2,GX_H-92,56,b); },
+  flagCorner(x,P){ const b="#0D5EAF"; gxFrame(x,b,44,3);
+    x.save(); x.beginPath(); x.rect(52,52,166,112); x.clip(); for(let i=0;i<9;i++){ x.fillStyle=i%2?"#fff":b; x.fillRect(52,52+i*12.5,166,12.5); } x.fillStyle=b; x.fillRect(52,52,71,62); x.fillStyle="#fff"; x.fillRect(78,52,16,62); x.fillRect(52,77,71,15); x.restore();
+    x.strokeStyle=b; x.lineWidth=2.5; x.strokeRect(52,52,166,112);
+    gxLaurel(x,GX_W-96,GX_H-96,120,b,Math.PI*1.27); gxLaurel(x,96,GX_H-96,120,b,-Math.PI*0.27); },
+  flagWave(x,P){ const b="#0D5EAF"; x.save(); x.globalAlpha=.9; for(let i=0;i<9;i++){ x.fillStyle=i%2?"#fff":b; x.beginPath(); for(let px=0;px<=GX_W;px+=10) x.lineTo(px,GX_H-104+i*11.5+Math.sin(px/95)*9); for(let px=GX_W;px>=0;px-=10) x.lineTo(px,GX_H-104+(i+1)*11.5+Math.sin(px/95)*9); x.closePath(); x.fill(); } x.restore();
+    gxFrame(x,b,44,3); gxCross(x,110,120,60,b); gxCross(x,GX_W-110,120,60,b); },
+
+  flowers(x,P){ gxFrame(x,P.ac,44,2.5); x.strokeStyle=P.ac4||"#3E7A4E"; x.lineWidth=5;
+    x.beginPath(); for(let i=0;i<=GX_W;i+=10) x.lineTo(i,GX_H-92+Math.sin(i/58)*13); x.stroke();
+    let i=0; for(let px=120;px<=GX_W-120;px+=132){ gxFlower(x,px,GX_H-118,i%2?32:26,[P.ac,P.ac2||P.ac,P.ac3||P.ac][i%3],P.ac5||"#E8B33A"); i++; }
+    gxFlower(x,110,120,34,P.ac,P.ac5); gxFlower(x,GX_W-110,120,34,P.ac2||P.ac,P.ac5); },
+  wreath(x,P){ gxFrame(x,P.ac,46,2.5); [[92,92,Math.PI*0.27],[GX_W-92,92,Math.PI*0.73],[92,GX_H-92,-Math.PI*0.27],[GX_W-92,GX_H-92,Math.PI*1.27]].forEach(p=>{ gxLaurel(x,p[0],p[1],112,P.ac4||"#3E7A4E",p[2]); gxFlower(x,p[0],p[1],26,P.ac,P.ac5); });
+    let i=0; for(let px=380;px<=GX_W-380;px+=160){ gxFlower(x,px,GX_H-84,24,[P.ac,P.ac2||P.ac][i%2],P.ac5); i++; } },
+
+  hazard(x,P){ gxTape(x,0,54,P.ac,"#1B1B1B"); gxTape(x,GX_H-54,54,P.ac,"#1B1B1B"); gxFrame(x,"#1B1B1B",72,2);
+    gxGear(x,132,GX_H-160,44,P.ac2||"#6B7A80"); gxGear(x,GX_W-132,168,44,P.ac2||"#6B7A80"); },
+  cones(x,P){ gxFrame(x,P.ac,44,3); x.fillStyle="#1B1B1B"; x.fillRect(0,GX_H-58,GX_W,7);
+    [150,GX_W-150,330,GX_W-330].forEach(cx=>gxCone(x,cx,GX_H-58,150,P.ac));
+    gxTape(x,0,44,P.ac,"#1B1B1B"); },
+  gears(x,P){ gxFrame(x,P.ac,44,3); gxGear(x,128,130,54,P.ac); gxGear(x,180,182,28,P.ac2||P.ac); gxGear(x,GX_W-128,GX_H-130,54,P.ac); gxGear(x,GX_W-214,GX_H-196,34,P.ac2||P.ac);
+    x.fillStyle=P.ac; x.fillRect(0,GX_H-46,GX_W,6); x.fillRect(0,40,GX_W,6); },
+  boxes(x,P){ gxFrame(x,P.ac,44,2.5); let i=0; for(let px=130;px<=GX_W-130;px+=152){ gxBox(x,px,GX_H-70,i%2?92:74,P.ac2||"#C99A54",P.ac); i++; }
+    gxClock(x,124,132,52,P.ac); gxClock(x,GX_W-124,132,52,P.ac); },
+  alert(x,P){ x.fillStyle=P.ac; x.fillRect(0,0,GX_W,74); x.fillRect(0,GX_H-74,GX_W,74);
+    [[0,158],[GX_W-158,GX_W]].forEach(z=>{ x.save(); x.beginPath(); x.rect(z[0],74,z[1]-z[0],GX_H-148); x.clip();
+      x.strokeStyle=P.ac; x.globalAlpha=.30; x.lineWidth=17;
+      for(let i=-GX_H;i<z[1]-z[0]+40;i+=46){ x.beginPath(); x.moveTo(z[0]+i,74); x.lineTo(z[0]+i+(GX_H-148),GX_H-74); x.stroke(); } x.restore(); });
+    x.strokeStyle=P.ac; x.lineWidth=3; x.globalAlpha=.8;
+    x.beginPath(); x.moveTo(176,74); x.lineTo(176,GX_H-74); x.stroke();
+    x.beginPath(); x.moveTo(GX_W-176,74); x.lineTo(GX_W-176,GX_H-74); x.stroke(); x.globalAlpha=1;
+    gxWarnSign(x,GX_W/2,37,25,"#fff",P.ac); gxWarnSign(x,GX_W/2,GX_H-37,25,"#fff",P.ac); },
+
+  crossSea(x,P){ gxFrame(x,P.ac,44,2.5); gxWaves(x,GX_H-136,P.ac,15,4,.8); gxCross(x,124,140,86,P.ac); gxCross(x,GX_W-124,140,86,P.ac);
+    x.fillStyle=P.ac2||P.ac; for(let px=300;px<=GX_W-300;px+=170){ x.beginPath(); x.arc(px,86,10,0,7); x.fill(); } },
+  ribbon(x,P){ gxFrame(x,P.ac,44,3); gxRibbon(x,GX_W/2,96,320,P.ac,P.ac2||P.ac);
+    gxStar(x,140,GX_H-140,34,P.ac); gxStar(x,GX_W-140,GX_H-140,34,P.ac); gxConfetti(x,[P.ac,P.ac2||P.ac,P.ac3||P.ac],5); }
+};
+
+/* ---- παλέτες & περιστάσεις ---- */
+const GFX_DATA=[
+ {k:"xmas",n:"Χριστούγεννα",
+  texts:[
+   "Αγαπητοί πελάτες,\nΣας ενημερώνουμε ότι το κατάστημά μας θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}, λόγω των εορτών των Χριστουγέννων.\nΘα επαναλειτουργήσουμε κανονικά αμέσως μετά.\n\nΣας ευχόμαστε Καλά Χριστούγεννα και ένα δημιουργικό νέο έτος.",
+   "Εορταστικό ωράριο λειτουργίας\nΑπό {ΑΠΟ} έως {ΕΩΣ} το κατάστημα θα λειτουργεί με διευρυμένο ωράριο.\nΓια ραντεβού και παραγγελίες επικοινωνήστε μαζί μας.\n\nΚαλές γιορτές σε εσάς και τις οικογένειές σας.",
+   "Ευχαριστούμε για την εμπιστοσύνη σας όλη τη χρονιά.\nΤις ημέρες των εορτών, από {ΑΠΟ} έως {ΕΩΣ}, θα λειτουργήσουμε με περιορισμένο ωράριο.\n\nΧρόνια πολλά, με υγεία και χαρά."],
+  themes:[
+   {n:"Κλασικό χρυσό",s:"Λιτό πλαίσιο, ζεστοί τόνοι",deco:"dbl",pal:{bg:"#FBF7EE",ink:"#1B3A2E",sub:"#5C7A6B",ac:"#B0842F",ac2:"#8A1E2B"}},
+   {n:"Νιφάδες",s:"Χιόνι στο περίγραμμα",deco:"snow",pal:{bg:"#F4F9FC",ink:"#123A52",sub:"#4E7A93",ac:"#2E7BA6",ac2:"#8FC4DD"}},
+   {n:"Έλατα",s:"Δάσος στο κάτω μέρος",deco:"trees",pal:{bg:"#FAFDF9",ink:"#14402C",sub:"#4C7A62",ac:"#1D5E3F",ac2:"#9FC9AE",ac3:"#EAF3ED"}},
+   {n:"Αστέρια",s:"Βαθύ κόκκινο με χρυσό",deco:"stars",pal:{bg:"#FFF8F5",ink:"#6E1620",sub:"#9A5057",ac:"#B0842F",ac2:"#8A1E2B"}}]},
+
+ {k:"ny",n:"Πρωτοχρονιά / Νέο Έτος",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤην Πρωτοχρονιά, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ} με το κανονικό μας ωράριο.\n\nΕυτυχισμένο το νέο έτος — με υγεία, πρόοδο και δημιουργία.",
+   "Καλή Χρονιά!\nΣας ευχαριστούμε που μας εμπιστευτήκατε άλλη μια χρονιά.\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}.\n\nΜε εκτίμηση, η ομάδα μας.",
+   "Νέα χρονιά, νέοι στόχοι.\nΑπό {ΑΠΟ} ξεκινάμε με ανανεωμένο πρόγραμμα και νέες υπηρεσίες.\nΣας περιμένουμε."],
+  themes:[
+   {n:"Κομφετί",s:"Γιορτινό, πολύχρωμο",deco:"conf",pal:{bg:"#FFFDF7",ink:"#1B2A38",sub:"#5A6E7E",ac:"#B0842F",ac2:"#1E6E6A",ac3:"#A83A2C"}},
+   {n:"Μεσάνυχτα",s:"Αστέρια σε χρυσό",deco:"stars",pal:{bg:"#FAF6EC",ink:"#16283A",sub:"#55707F",ac:"#B0842F",ac2:"#D8B25F"}},
+   {n:"Ρολόι",s:"Αντίστροφη μέτρηση",deco:"clock",pal:{bg:"#F7F9FB",ink:"#16283A",sub:"#54707E",ac:"#1E6E6A",ac2:"#B0842F"}},
+   {n:"Σερπαντίνες",s:"Χαρούμενο, κινητικό",deco:"serp",pal:{bg:"#FFFBF6",ink:"#22303C",sub:"#5E7280",ac:"#C2483A",ac2:"#B0842F",ac3:"#1E6E6A"}}]},
+
+ {k:"epiph",n:"Θεοφάνεια (6 Ιανουαρίου)",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤην ημέρα των Θεοφανείων, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ}.\n\nΧρόνια πολλά σε όλους.",
+   "Λόγω του εορτασμού των Θεοφανείων, από {ΑΠΟ} έως {ΕΩΣ} θα λειτουργήσουμε με περιορισμένο ωράριο.\nΕυχαριστούμε για την κατανόηση."],
+  themes:[
+   {n:"Θαλασσινό",s:"Κύματα & σταυρός",deco:"crossSea",pal:{bg:"#F4FAFC",ink:"#0E3B52",sub:"#4A7A93",ac:"#1E6E9C",ac2:"#8FC4DD"}},
+   {n:"Λιτό μπλε",s:"Καθαρό πλαίσιο",deco:"dbl",pal:{bg:"#F8FBFD",ink:"#123A52",sub:"#4E7A93",ac:"#2E7BA6"}},
+   {n:"Κυματισμοί",s:"Ήρεμο, διακριτικό",deco:"waves",pal:{bg:"#FBFDFE",ink:"#123A52",sub:"#4E7A93",ac:"#4C93BC",ac2:"#B0842F"}}]},
+
+ {k:"carn",n:"Απόκριες & Καθαρά Δευτέρα",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤην Καθαρά Δευτέρα, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ} κανονικά.\n\nΚαλή Σαρακοστή και καλό ξεκίνημα!",
+   "Καλές Απόκριες!\nΑπό {ΑΠΟ} έως {ΕΩΣ} το κατάστημα θα λειτουργήσει με εορταστικό ωράριο.\nΠεράστε να μας δείτε.",
+   "Κούλουμα!\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}.\nΣας ευχόμαστε καλή διασκέδαση με ασφάλεια."],
+  themes:[
+   {n:"Χαρταετοί",s:"Καθαρά Δευτέρα",deco:"kites",pal:{bg:"#F8FBFE",ink:"#1C3B4C",sub:"#557686",ac:"#2E7BA6",ac2:"#C2483A",ac3:"#B0842F"}},
+   {n:"Σερπαντίνες",s:"Καρναβαλικό",deco:"serp",pal:{bg:"#FFFBF7",ink:"#3A2440",sub:"#6E5578",ac:"#8E3E8F",ac2:"#D9A02B",ac3:"#2E9B8F"}},
+   {n:"Κομφετί",s:"Πολύχρωμο, νεανικό",deco:"conf",pal:{bg:"#FFFDF9",ink:"#2B2F3A",sub:"#63707F",ac:"#C2483A",ac2:"#2E9B8F",ac3:"#D9A02B"}},
+   {n:"Λιτό",s:"Χωρίς φασαρία",deco:"corner",pal:{bg:"#FAFBF9",ink:"#22303C",sub:"#5E7280",ac:"#8E3E8F"}}]},
+
+ {k:"mar25",n:"25η Μαρτίου",
+  texts:[
+   "Αγαπητοί πελάτες,\nΛόγω της εθνικής εορτής της 25ης Μαρτίου, το κατάστημα θα παραμείνει κλειστό στις {ΑΠΟ}.\nΕπαναλειτουργούμε {ΕΩΣ}.\n\nΧρόνια πολλά.",
+   "25η Μαρτίου — Ημέρα Εθνικής Παλιγγενεσίας.\nΤιμούμε την ημέρα και παραμένουμε κλειστά από {ΑΠΟ} έως {ΕΩΣ}.\n\nΖήτω η 25η Μαρτίου."],
+  themes:[
+   {n:"Γαλανόλευκο",s:"Ρίγες στις γωνίες",deco:"flagStripes",pal:{bg:"#FBFDFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Σημαία",s:"Σημαία & δάφνη",deco:"flagCorner",pal:{bg:"#FFFFFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Κυματισμός",s:"Σημαία στο κάτω μέρος",deco:"flagWave",pal:{bg:"#FBFDFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Δάφνη",s:"Επίσημο, λιτό",deco:"laurel",pal:{bg:"#FCFDFB",ink:"#183A2C",sub:"#4E7263",ac:"#1D5E3F",ac2:"#B0842F"}}]},
+
+ {k:"easter",n:"Πάσχα",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤο κατάστημά μας θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}, λόγω των εορτών του Πάσχα.\nΘα επαναλειτουργήσουμε κανονικά αμέσως μετά.\n\nΧριστός Ανέστη — Καλό Πάσχα με υγεία.",
+   "Εορταστικό ωράριο Μεγάλης Εβδομάδας\nΑπό {ΑΠΟ} έως {ΕΩΣ} θα λειτουργούμε με διευρυμένο ωράριο για την εξυπηρέτησή σας.\n\nΚαλή Ανάσταση.",
+   "Σας ευχόμαστε Καλό Πάσχα!\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}.\nΓια επείγοντα, επικοινωνήστε τηλεφωνικά."],
+  themes:[
+   {n:"Αυγά κάτω",s:"Σειρά αυγών στη βάση",deco:"eggsBottom",pal:{bg:"#FFFCF6",ink:"#5A2440",sub:"#8A6076",ac:"#B0842F",e1:"#C2483A",e2:"#2E9B8F",e3:"#D9A02B",e4:"#8E3E8F"}},
+   {n:"Αυγά περιμετρικά",s:"Πλαίσιο από αυγά",deco:"eggsBorder",pal:{bg:"#FFFDF8",ink:"#43325A",sub:"#7A6B90",ac:"#8E7BB0",e1:"#E0736A",e2:"#6FC0B4",e3:"#E8BF5A",e4:"#A98CC9"}},
+   {n:"Λαμπάδες & αυγά",s:"Ανάσταση, ζεστό",deco:"candles",pal:{bg:"#FFFBF4",ink:"#6E1620",sub:"#9A5057",ac:"#B0842F",ac2:"#8A1E2B",e1:"#C2483A",e2:"#D9A02B",e3:"#2E9B8F"}},
+   {n:"Δάφνη",s:"Λιτό & επίσημο",deco:"laurel",pal:{bg:"#FCFDFA",ink:"#1F4030",sub:"#547566",ac:"#1D5E3F",ac2:"#B0842F"}}]},
+
+ {k:"may1",n:"Πρωτομαγιά",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤην Πρωτομαγιά, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ} με το κανονικό μας ωράριο.\n\nΚαλό μήνα και καλή Πρωτομαγιά.",
+   "Πρωτομαγιά — αργία.\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}.\nΕυχαριστούμε για την κατανόηση."],
+  themes:[
+   {n:"Λουλούδια",s:"Ανθισμένη βάση",deco:"flowers",pal:{bg:"#FCFEF9",ink:"#2A4A2E",sub:"#5E7F62",ac:"#D9548C",ac2:"#E8873A",ac3:"#8E6BC9",ac4:"#3E7A4E",ac5:"#E8B33A"}},
+   {n:"Στεφάνι",s:"Γωνιακά στεφάνια",deco:"wreath",pal:{bg:"#FDFEFB",ink:"#2A4A2E",sub:"#5E7F62",ac:"#D9548C",ac2:"#E8873A",ac4:"#3E7A4E",ac5:"#E8B33A"}},
+   {n:"Λιτό ανοιξιάτικο",s:"Καθαρό πλαίσιο",deco:"corner",pal:{bg:"#FBFDF8",ink:"#2A4A2E",sub:"#5E7F62",ac:"#3E7A4E"}}]},
+
+ {k:"hspirit",n:"Αγίου Πνεύματος",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤη Δευτέρα του Αγίου Πνεύματος, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ}.\n\nΧρόνια πολλά.",
+   "Λόγω της αργίας του Αγίου Πνεύματος, θα παραμείνουμε κλειστά από {ΑΠΟ} έως {ΕΩΣ}.\nΕυχαριστούμε για την κατανόηση."],
+  themes:[
+   {n:"Δάφνη",s:"Λιτό & επίσημο",deco:"laurel",pal:{bg:"#FCFDFA",ink:"#1F4030",sub:"#547566",ac:"#1D5E3F",ac2:"#B0842F"}},
+   {n:"Κλασικό χρυσό",s:"Διπλό πλαίσιο",deco:"dbl",pal:{bg:"#FBF8F1",ink:"#3A2C18",sub:"#7A6A50",ac:"#B0842F"}},
+   {n:"Ήρεμο μπλε",s:"Διακριτικοί κυματισμοί",deco:"waves",pal:{bg:"#F9FCFD",ink:"#123A52",sub:"#4E7A93",ac:"#4C93BC",ac2:"#B0842F"}}]},
+
+ {k:"summer",n:"Θερινές διακοπές / Καλοκαίρι",
+  texts:[
+   "Αγαπητοί πελάτες,\nΤο κατάστημά μας θα παραμείνει κλειστό για τις θερινές διακοπές από {ΑΠΟ} έως {ΕΩΣ}.\nΘα επαναλειτουργήσουμε κανονικά μετά την επιστροφή μας.\n\nΣας ευχόμαστε καλό καλοκαίρι!",
+   "Θερινό ωράριο λειτουργίας\nΑπό {ΑΠΟ} έως {ΕΩΣ} το κατάστημα θα λειτουργεί με θερινό ωράριο.\nΓια ραντεβού επικοινωνήστε μαζί μας.\n\nΚαλό καλοκαίρι.",
+   "Κλειστά για διακοπές\nΑπό {ΑΠΟ} έως {ΕΩΣ}. Για επείγουσες ανάγκες μπορείτε να επικοινωνείτε τηλεφωνικά.\n\nΕυχαριστούμε και καλή ξεκούραση σε όλους."],
+  themes:[
+   {n:"Ήλιος & θάλασσα",s:"Φοίνικες και κύμα",deco:"sunSea",pal:{bg:"#F6FBFE",ink:"#0E3B52",sub:"#4A7A93",ac:"#2E9BC4",ac2:"#E8A62B",ac3:"#FBF3DC",ac4:"#2C7A5B"}},
+   {n:"Παραλία",s:"Ομπρέλες & άμμος",deco:"beach",pal:{bg:"#FDFBF4",ink:"#1C4A5A",sub:"#57808F",ac:"#2E9BC4",ac2:"#E8734A",ac3:"#F2E4C4",ac4:"#D9A05B"}},
+   {n:"Κοχύλια",s:"Λιτό, καλοκαιρινό",deco:"shells",pal:{bg:"#FBFDFE",ink:"#1C4A5A",sub:"#57808F",ac:"#5AB2C9",ac2:"#E8A62B"}},
+   {n:"Κυματισμοί",s:"Πολύ διακριτικό",deco:"waves",pal:{bg:"#F9FDFE",ink:"#0E3B52",sub:"#4A7A93",ac:"#3FA6C9",ac2:"#E8A62B"}}]},
+
+ {k:"aug15",n:"Δεκαπενταύγουστος",
+  texts:[
+   "Αγαπητοί πελάτες,\nΑνήμερα του Δεκαπενταύγουστου, {ΑΠΟ}, το κατάστημα θα παραμείνει κλειστό.\nΕπαναλειτουργούμε {ΕΩΣ}.\n\nΧρόνια πολλά σε όσους και όσες γιορτάζουν.",
+   "Λόγω της εορτής της Κοιμήσεως της Θεοτόκου θα παραμείνουμε κλειστά από {ΑΠΟ} έως {ΕΩΣ}.\nΕυχαριστούμε για την κατανόηση."],
+  themes:[
+   {n:"Θαλασσινό",s:"Καλοκαιρινή αργία",deco:"sunSea",pal:{bg:"#F7FBFE",ink:"#0E3B52",sub:"#4A7A93",ac:"#2E9BC4",ac2:"#E8A62B",ac3:"#FBF3DC",ac4:"#2C7A5B"}},
+   {n:"Δάφνη",s:"Επίσημο",deco:"laurel",pal:{bg:"#FCFDFA",ink:"#1F4030",sub:"#547566",ac:"#1D5E3F",ac2:"#B0842F"}},
+   {n:"Κλασικό χρυσό",s:"Λιτό πλαίσιο",deco:"dbl",pal:{bg:"#FBF8F1",ink:"#3A2C18",sub:"#7A6A50",ac:"#B0842F"}}]},
+
+ {k:"oct28",n:"28η Οκτωβρίου",
+  texts:[
+   "Αγαπητοί πελάτες,\nΛόγω της εθνικής εορτής της 28ης Οκτωβρίου, το κατάστημα θα παραμείνει κλειστό στις {ΑΠΟ}.\nΕπαναλειτουργούμε {ΕΩΣ}.\n\nΧρόνια πολλά.",
+   "28η Οκτωβρίου — Επέτειος του ΟΧΙ.\nΤιμούμε την ημέρα και παραμένουμε κλειστά από {ΑΠΟ} έως {ΕΩΣ}."],
+  themes:[
+   {n:"Γαλανόλευκο",s:"Ρίγες στις γωνίες",deco:"flagStripes",pal:{bg:"#FBFDFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Σημαία",s:"Σημαία & δάφνη",deco:"flagCorner",pal:{bg:"#FFFFFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Κυματισμός",s:"Σημαία στο κάτω μέρος",deco:"flagWave",pal:{bg:"#FBFDFF",ink:"#0D3A66",sub:"#4A6E93",ac:"#0D5EAF"}},
+   {n:"Δάφνη",s:"Λιτό & επίσημο",deco:"laurel",pal:{bg:"#FCFDFB",ink:"#183A2C",sub:"#4E7263",ac:"#1D5E3F",ac2:"#B0842F"}}]},
+
+ {k:"maint",n:"Επισκευές & Συντήρηση",
+  texts:[
+   "ΕΝΗΜΕΡΩΣΗ ΠΡΟΣ ΤΟΥΣ ΠΕΛΑΤΕΣ\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ} λόγω εργασιών συντήρησης και ανακαίνισης.\nΘα επαναλειτουργήσουμε ανανεωμένοι, με στόχο την καλύτερη εξυπηρέτησή σας.\n\nΕυχαριστούμε για την κατανόηση.",
+   "Εργασίες αναβάθμισης\nΑπό {ΑΠΟ} έως {ΕΩΣ} πραγματοποιούνται εργασίες στον χώρο μας.\nΗ λειτουργία θα συνεχιστεί με περιορισμένο ωράριο και ενδέχεται να υπάρξει μικρή καθυστέρηση στην εξυπηρέτηση.\n\nΖητούμε την κατανόησή σας.",
+   "Προγραμματισμένη συντήρηση εξοπλισμού\nΤην {ΑΠΟ} το κατάστημα θα λειτουργήσει μόνο κατόπιν ραντεβού.\nΓια οποιαδήποτε ανάγκη, επικοινωνήστε τηλεφωνικά."],
+  themes:[
+   {n:"Ταινία ασφαλείας",s:"Έντονο, ευδιάκριτο",deco:"hazard",pal:{bg:"#FFFDF3",ink:"#2B2B2B",sub:"#6A6A6A",ac:"#E8B33A",ac2:"#6B7A80"}},
+   {n:"Κώνοι",s:"Εργοταξιακό ύφος",deco:"cones",pal:{bg:"#FFFCF5",ink:"#2B2B2B",sub:"#6A6A6A",ac:"#E8722B"}},
+   {n:"Γρανάζια",s:"Τεχνικό, λιτό",deco:"gears",pal:{bg:"#F9FAFB",ink:"#23333B",sub:"#5E7280",ac:"#5E7280",ac2:"#9AA9B2"}},
+   {n:"Λιτό",s:"Χωρίς εικονογράφηση",deco:"band",pal:{bg:"#FBFCFB",ink:"#23333B",sub:"#5E7280",ac:"#3A5560",ac2:"#B0842F"}}]},
+
+ {k:"hours",n:"Αλλαγή ωραρίου λειτουργίας",
+  texts:[
+   "ΝΕΟ ΩΡΑΡΙΟ ΛΕΙΤΟΥΡΓΙΑΣ\nΑπό {ΑΠΟ} το κατάστημα θα λειτουργεί με νέο ωράριο:\n\nΔευτέρα – Παρασκευή: 08:00 – 20:00\nΣάββατο: 09:00 – 15:00\nΚυριακή: κλειστά\n\nΕυχαριστούμε για την προτίμησή σας.",
+   "Προσωρινή αλλαγή ωραρίου\nΑπό {ΑΠΟ} έως {ΕΩΣ} θα λειτουργούμε με τροποποιημένο ωράριο.\nΓια ραντεβού και πληροφορίες επικοινωνήστε μαζί μας."],
+  themes:[
+   {n:"Ρολόι",s:"Καθαρό & σαφές",deco:"clock",pal:{bg:"#F8FAFB",ink:"#16283A",sub:"#54707E",ac:"#1E6E6A",ac2:"#B0842F"}},
+   {n:"Λιτό με μπάρες",s:"Επαγγελματικό",deco:"band",pal:{bg:"#FBFCFB",ink:"#10242B",sub:"#5E7280",ac:"#10242B",ac2:"#B0842F"}},
+   {n:"Γωνιακό",s:"Διακριτικό",deco:"corner",pal:{bg:"#FCFDFC",ink:"#10242B",sub:"#5E7280",ac:"#B0842F"}}]},
+
+ {k:"invent",n:"Απογραφή",
+  texts:[
+   "ΕΤΗΣΙΑ ΑΠΟΓΡΑΦΗ\nΤο κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ} λόγω διενέργειας απογραφής αποθεμάτων.\nΘα επαναλειτουργήσουμε κανονικά αμέσως μετά.\n\nΕυχαριστούμε για την κατανόηση.",
+   "Λόγω απογραφής, την {ΑΠΟ} θα λειτουργήσουμε με περιορισμένο ωράριο.\nΟι παραδόσεις και οι παραλαβές θα εξυπηρετηθούν κανονικά από {ΕΩΣ}."],
+  themes:[
+   {n:"Κιβώτια",s:"Αποθήκη & ρολόι",deco:"boxes",pal:{bg:"#FDFBF6",ink:"#3A2C18",sub:"#7A6A50",ac:"#8A6A32",ac2:"#C99A54"}},
+   {n:"Λιτό με μπάρες",s:"Επαγγελματικό",deco:"band",pal:{bg:"#FBFCFB",ink:"#10242B",sub:"#5E7280",ac:"#3A5560",ac2:"#B0842F"}},
+   {n:"Γρανάζια",s:"Τεχνικό",deco:"gears",pal:{bg:"#F9FAFB",ink:"#23333B",sub:"#5E7280",ac:"#5E7280",ac2:"#9AA9B2"}}]},
+
+ {k:"urgent",n:"Έκτακτο κλείσιμο",
+  texts:[
+   "ΕΚΤΑΚΤΗ ΑΝΑΚΟΙΝΩΣΗ\nΛόγω εκτάκτων συνθηκών, το κατάστημα θα παραμείνει κλειστό από {ΑΠΟ} έως {ΕΩΣ}.\nΘα υπάρξει νεότερη ενημέρωση.\n\nΕυχαριστούμε για την κατανόηση.",
+   "Λόγω δυσμενών καιρικών συνθηκών, την {ΑΠΟ} το κατάστημα δεν θα λειτουργήσει.\nΠαρακαλούμε παρακολουθείτε τις ανακοινώσεις μας για την επαναλειτουργία.",
+   "Έκτακτη διακοπή λειτουργίας\nΑπό {ΑΠΟ} έως {ΕΩΣ}. Για επείγοντα ζητήματα επικοινωνήστε τηλεφωνικά."],
+  themes:[
+   {n:"Προσοχή",s:"Έντονο, αδιαμφισβήτητο",deco:"alert",pal:{bg:"#FFF9F7",ink:"#7A1A12",sub:"#A5564C",ac:"#A83A2C",ac2:"#F2C9C2"}},
+   {n:"Ταινία ασφαλείας",s:"Κίτρινο/μαύρο",deco:"hazard",pal:{bg:"#FFFDF3",ink:"#2B2B2B",sub:"#6A6A6A",ac:"#E8B33A",ac2:"#6B7A80"}},
+   {n:"Λιτό επίσημο",s:"Χωρίς δραματοποίηση",deco:"band",pal:{bg:"#FBFCFB",ink:"#10242B",sub:"#5E7280",ac:"#10242B",ac2:"#A83A2C"}}]},
+
+ {k:"open",n:"Έναρξη λειτουργίας / Νέα υπηρεσία",
+  texts:[
+   "ΑΝΟΙΓΟΥΜΕ!\nΣας περιμένουμε από {ΑΠΟ} στον ανανεωμένο μας χώρο.\nΕλάτε να μας γνωρίσετε — θα χαρούμε πολύ να σας εξυπηρετήσουμε.",
+   "Νέα υπηρεσία\nΑπό {ΑΠΟ} προσθέτουμε μια νέα υπηρεσία στο πρόγραμμά μας.\nΓια πληροφορίες και ραντεβού επικοινωνήστε μαζί μας.",
+   "Επαναλειτουργία\nΜετά τις εργασίες ανακαίνισης, επιστρέφουμε {ΑΠΟ} με ανανεωμένο χώρο και νέο ωράριο.\nΣας ευχαριστούμε για την υπομονή σας."],
+  themes:[
+   {n:"Κορδέλα εγκαινίων",s:"Γιορτινό ξεκίνημα",deco:"ribbon",pal:{bg:"#FFFDF8",ink:"#1B3A2E",sub:"#5C7A6B",ac:"#B0842F",ac2:"#1E6E6A",ac3:"#C2483A"}},
+   {n:"Κομφετί",s:"Χαρούμενο",deco:"conf",pal:{bg:"#FFFDF9",ink:"#22303C",sub:"#5E7280",ac:"#1E6E6A",ac2:"#B0842F",ac3:"#C2483A"}},
+   {n:"Αστέρια",s:"Κομψό",deco:"stars",pal:{bg:"#FAF7F0",ink:"#3A2C18",sub:"#7A6A50",ac:"#B0842F",ac2:"#1E6E6A"}},
+   {n:"Λιτό γωνιακό",s:"Σοβαρό & καθαρό",deco:"corner",pal:{bg:"#FCFDFC",ink:"#10242B",sub:"#5E7280",ac:"#1E6E6A"}}]}
+];
+
+/* ---- βοηθητικά ---- */
+function gxOcc(){ return GFX_DATA.find(o=>o.k===gfxState.occ)||GFX_DATA[0]; }
+function gxTheme(){ const o=gxOcc(); return o.themes[gfxState.theme]||o.themes[0]; }
+function gxFillDates(t){
+  const f=$("#gxFrom")&&$("#gxFrom").value ? grDate($("#gxFrom").value) : "……";
+  const e=$("#gxTo")&&$("#gxTo").value ? grDate($("#gxTo").value) : "……";
+  return String(t||"").split("{ΑΠΟ}").join(f).split("{ΕΩΣ}").join(e);
+}
+function gxWrap(x,text,maxW){
+  const out=[];
+  String(text||"").split("\n").forEach(par=>{
+    if(!par.trim()){ out.push(""); return; }
+    const words=par.split(/\s+/); let ln="";
+    words.forEach(w=>{ const t=ln?ln+" "+w:w; if(x.measureText(t).width>maxW&&ln){ out.push(ln); ln=w; } else ln=t; });
+    if(ln) out.push(ln);
+  });
+  return out;
+}
+function gxLoadImg(src){
+  return new Promise(res=>{
+    if(!src) return res({im:null,tainted:false});
+    const remote=/^https?:/i.test(src);
+    const a=new Image();
+    if(remote) a.crossOrigin="anonymous";
+    a.onload=()=>res({im:a,tainted:false});
+    a.onerror=()=>{
+      if(!remote) return res({im:null,tainted:false});
+      const b=new Image();
+      b.onload=()=>res({im:b,tainted:true});
+      b.onerror=()=>res({im:null,tainted:false});
+      b.src=src;
+    };
+    a.src=src;
+  });
+}
+function gxLogoSrc(){
+  if(gfxState.logoMode==="none") return "";
+  if(gfxState.logoMode==="biz") return prof().logo||brandLogo();
+  return gfxState.logoSrc||"";
+}
+
+/* ---- ζωγραφική αφίσας ---- */
+async function gfxDraw(){
+  const cv=$("#gxCv"); if(!cv) return;
+  cv.width=GX_W; cv.height=GX_H;
+  const x=cv.getContext("2d");
+  const th=gxTheme(), P=th.pal;
+
+  x.fillStyle=P.bg; x.fillRect(0,0,GX_W,GX_H);
+  /* Δικλείδα: τα διακοσμητικά σχεδιάζονται ΜΟΝΟ εκτός της ζώνης κειμένου. */
+  x.save();
+  x.beginPath();
+  x.rect(0,0,GX_W,GX_H);
+  x.rect(GX_SAFE.x,GX_SAFE.y,GX_SAFE.w,GX_SAFE.h);
+  x.clip("evenodd");
+  try{ (GFX_DECO[th.deco]||GFX_DECO.plain)(x,P); }catch(e){ try{ GFX_DECO.plain(x,P); }catch(e2){} }
+  x.restore();
+
+  const {im,tainted}=await gxLoadImg(gxLogoSrc());
+  gfxState.tainted=!!tainted;
+  const wn=$("#gxWarn");
+  if(wn) wn.innerHTML = tainted
+    ? "<b style='color:#A83A2C'>Προσοχή:</b> η εικόνα φορτώθηκε από εξωτερικό σύνδεσμο χωρίς άδεια CORS. Η προεπισκόπηση δουλεύει, αλλά η <b>λήψη αρχείου μπορεί να αποτύχει</b>. Κατεβάστε την εικόνα στον υπολογιστή σας και χρησιμοποιήστε «Ανέβασμα αρχείου»."
+    : "";
+
+  let y=GX_SAFE.y;
+  if(im){
+    const maxH=178, maxW=560;
+    const r=Math.min(maxH/im.height,maxW/im.width,1.6);
+    const w=im.width*r, h=im.height*r;
+    x.drawImage(im,(GX_W-w)/2,y,w,h);
+    y+=h+52;
+  } else { y+=18; }
+
+  /* Τίτλος: έντονα + υπογραμμισμένα */
+  const title=(($("#gxTitle")&&$("#gxTitle").value)||"ΑΝΑΚΟΙΝΩΣΗ").trim()||"ΑΝΑΚΟΙΝΩΣΗ";
+  let tf=76; x.font=`700 ${tf}px Georgia, "Times New Roman", serif`;
+  while(x.measureText(title).width>GX_SAFE.w*0.9&&tf>34){ tf-=3; x.font=`700 ${tf}px Georgia, "Times New Roman", serif`; }
+  x.fillStyle=P.ink; x.textAlign="center"; x.textBaseline="alphabetic";
+  x.fillText(title,GX_W/2,y+tf);
+  const tw=x.measureText(title).width;
+  x.strokeStyle=P.ink; x.lineWidth=Math.max(3,tf*0.055);
+  x.beginPath(); x.moveTo(GX_W/2-tw/2,y+tf+tf*0.24); x.lineTo(GX_W/2+tw/2,y+tf+tf*0.24); x.stroke();
+  y+=tf+tf*0.24+56;
+
+  /* Σώμα κειμένου */
+  const body=gxFillDates(($("#gxBody")&&$("#gxBody").value)||"");
+  const footH=118;
+  const availH=GX_SAFE.y+GX_SAFE.h-y-footH;
+  let fs=42, lines=[];
+  for(;fs>=17;fs-=1.5){
+    x.font=`${fs}px "Segoe UI", Arial, sans-serif`;
+    lines=gxWrap(x,body,GX_SAFE.w*0.94);
+    if(lines.length*(fs*1.48)<=availH) break;
+  }
+  x.font=`${fs}px "Segoe UI", Arial, sans-serif`;
+  x.fillStyle=P.ink;
+  const lh=fs*1.48;
+  const blockH=lines.length*lh;
+  let by=y+Math.max(0,(availH-blockH)/2);
+  lines.forEach(ln=>{ by+=lh; if(ln) x.fillText(ln,GX_W/2,by); });
+
+  /* Υπογραφή & στοιχεία */
+  const sign=(($("#gxSign")&&$("#gxSign").value)||"").trim();
+  const phone=(($("#gxPhone")&&$("#gxPhone").value)||"").trim();
+  const p=prof();
+  const brand=p.brand||"";
+  const fy=GX_SAFE.y+GX_SAFE.h-26;
+  x.strokeStyle=P.ac; x.lineWidth=2.5; x.globalAlpha=.55;
+  x.beginPath(); x.moveTo(GX_W/2-190,fy-58); x.lineTo(GX_W/2+190,fy-58); x.stroke(); x.globalAlpha=1;
+  if(sign||brand){ x.font=`600 30px Georgia, serif`; x.fillStyle=P.ink; x.fillText(sign||brand,GX_W/2,fy-16); }
+  const extra=[phone?("Τηλ. "+phone):"", (sign&&brand&&sign!==brand)?brand:""].filter(Boolean).join("  ·  ");
+  if(extra){ x.font=`23px "Segoe UI", Arial, sans-serif`; x.fillStyle=P.sub; x.fillText(extra,GX_W/2,fy+20); }
+  x.textAlign="left";
+}
+
+/* ---- εξαγωγή ---- */
+function gxFileName(ext){
+  const o=gxOcc();
+  const safe=String(o.n).replace(/[^\wΑ-Ωα-ωάέήίόύώϊϋΐΰ ]/g,"").trim().replace(/\s+/g,"_");
+  return `Anakoinosi_${safe}_${todayISO()}.${ext}`;
+}
+async function gxExport(kind){
+  const cv=$("#gxCv"); if(!cv) return;
+  await gfxDraw();
+  try{
+    if(kind==="png"){
+      const b=await new Promise(r=>cv.toBlob(r,"image/png"));
+      if(!b) throw new Error("blob");
+      download(gxFileName("png"),b); toast("Η εικόνα κατέβηκε (PNG)."); return;
+    }
+    if(kind==="jpg"){
+      const b=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.94));
+      if(!b) throw new Error("blob");
+      download(gxFileName("jpg"),b); toast("Η εικόνα κατέβηκε (JPG)."); return;
+    }
+    const u8=await canvasToJpegU8(cv,0.94);
+    download(gxFileName("pdf"),jpegPdf(u8,GX_W,GX_H)); toast("Το PDF κατέβηκε (A4 οριζόντιο).");
+  }catch(e){
+    toast("Η εξαγωγή απέτυχε — πιθανότατα λόγω εξωτερικής εικόνας (CORS). Ανεβάστε το λογότυπο ως αρχείο.",true);
+  }
+}
+
+/* ---- διεπαφή ---- */
+function gxRenderThemes(){
+  const box=$("#gxThemes"); if(!box) return;
+  const o=gxOcc();
+  if(gfxState.theme>=o.themes.length) gfxState.theme=0;
+  box.innerHTML=o.themes.map((t,i)=>`<button class="gxopt${i===gfxState.theme?" on":""}" data-gxth="${i}"><b>${esc(t.n)}</b><span>${esc(t.s||"")}</span></button>`).join("");
+  box.querySelectorAll("[data-gxth]").forEach(b=>b.onclick=()=>{ gfxState.theme=+b.dataset.gxth; gxRenderThemes(); gfxDraw(); });
+}
+function gxSuggestText(advance){
+  const o=gxOcc();
+  if(advance) gfxState.tvar=(gfxState.tvar+1)%o.texts.length;
+  const ta=$("#gxBody"); if(ta) ta.value=o.texts[gfxState.tvar%o.texts.length];
+}
+function gfxInit(){
+  if(gfxState.inited){ gfxDraw(); return; }
+  gfxState.inited=true;
+  const sel=$("#gxOcc");
+  if(sel){
+    sel.innerHTML=GFX_DATA.map(o=>`<option value="${o.k}">${esc(o.n)}</option>`).join("");
+    sel.value=gfxState.occ;
+    sel.onchange=()=>{ gfxState.occ=sel.value; gfxState.theme=0; gfxState.tvar=0; gxRenderThemes(); gxSuggestText(false); gfxDraw(); };
+  }
+  const p=prof();
+  if($("#gxSign")&&!$("#gxSign").value) $("#gxSign").value=p.brand?("Η Διεύθυνση"):"Η Διεύθυνση";
+  if($("#gxPhone")&&!$("#gxPhone").value&&p.phone) $("#gxPhone").value=p.phone;
+
+  gxRenderThemes();
+  gxSuggestText(false);
+
+  ["gxTitle","gxBody","gxSign","gxPhone","gxFrom","gxTo"].forEach(id=>{
+    const el=$("#"+id); if(!el) return;
+    el.addEventListener("input",()=>{ clearTimeout(gfxState._t); gfxState._t=setTimeout(gfxDraw,260); });
+    el.addEventListener("change",gfxDraw);
+  });
+  { const b=$("#gxSuggest"); if(b) b.onclick=()=>{ gxSuggestText(true); gfxDraw(); }; }
+  { const b=$("#gxClearTxt"); if(b) b.onclick=()=>{ const ta=$("#gxBody"); if(ta) ta.value=""; gfxDraw(); }; }
+  { const b=$("#gxRedraw"); if(b) b.onclick=gfxDraw; }
+  { const b=$("#gxPng"); if(b) b.onclick=()=>gxExport("png"); }
+  { const b=$("#gxJpg"); if(b) b.onclick=()=>gxExport("jpg"); }
+  { const b=$("#gxPdf"); if(b) b.onclick=()=>gxExport("pdf"); }
+
+  $$("#gxLogoMode [data-lmode]").forEach(b=>b.onclick=()=>{
+    gfxState.logoMode=b.dataset.lmode;
+    $$("#gxLogoMode [data-lmode]").forEach(o=>o.classList.toggle("on",o===b));
+    const fb=$("#gxLogoFileBox"), ub=$("#gxLogoUrlBox");
+    if(fb) fb.style.display=gfxState.logoMode==="file"?"block":"none";
+    if(ub) ub.style.display=gfxState.logoMode==="url"?"block":"none";
+    gfxDraw();
+  });
+  { const f=$("#gxLogoFile"); if(f) f.onchange=()=>{
+      const file=f.files&&f.files[0]; if(!file) return;
+      if(file.size>4*1024*1024){ toast("Η εικόνα είναι πολύ μεγάλη (>4 MB).",true); return; }
+      const rd=new FileReader();
+      rd.onload=()=>{ gfxState.logoSrc=rd.result; gfxState.logoMode="file"; gfxDraw(); toast("Το λογότυπο φορτώθηκε."); };
+      rd.onerror=()=>toast("Δεν ήταν δυνατή η ανάγνωση του αρχείου.",true);
+      rd.readAsDataURL(file);
+    } }
+  { const b=$("#gxLogoUrlGo"); if(b) b.onclick=()=>{
+      const u=(($("#gxLogoUrl")&&$("#gxLogoUrl").value)||"").trim();
+      if(!/^https?:\/\//i.test(u)){ toast("Δώστε πλήρη σύνδεσμο που ξεκινά με http:// ή https://",true); return; }
+      gfxState.logoSrc=u; gfxState.logoMode="url"; gfxDraw();
+    } }
+  gfxDraw();
+}
+
 /* ---------- 8. NAV ---------- */
 function go(v){
   if(v==="data"&&!dataPassOK){ askPass(); return; }
   $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.view===v));
   $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));
   renderAll(); window.scrollTo({top:0});
+  if(v==="graphics"){ try{ gfxInit(); }catch(e){ toast("Πρόβλημα στη φόρτωση των Γραφιστικών.",true); } }
 }
 
 /* ---------- 9. BINDINGS ---------- */
