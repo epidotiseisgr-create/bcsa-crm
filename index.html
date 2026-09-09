@@ -263,6 +263,10 @@
     <h2>Business Consultancy Services and Academy</h2>
     <p class="gsub">CRM — Διαχείριση Πελατών &amp; Ραντεβού<br><span>Ευάγγελος Γκούλιος</span></p>
     <div class="field" style="margin:18px 0 0;text-align:left">
+      <label for="gUser">Όνομα χρήστη <span style="font-weight:400;opacity:.7">(αν σας έχει δοθεί — αλλιώς αφήστε το κενό)</span></label>
+      <input id="gUser" type="text" placeholder="π.χ. volos" autocomplete="off">
+    </div>
+    <div class="field" style="margin:12px 0 0;text-align:left">
       <label for="gPw">Κωδικός εισόδου</label>
       <input id="gPw" type="password" placeholder="••••••••" autocomplete="off">
     </div>
@@ -724,7 +728,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.2 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.3 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1534,7 +1538,7 @@ async function deriveKEK(pw,salt){
 async function wrapFor(pwEntry,salt,dek){
   const kek=await deriveKEK(pwEntry.p,salt), iv=rnd(12);
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kek,dek));
-  return {id:pwEntry.id, label:pwEntry.label, until:pwEntry.until||null, admin:!!pwEntry.admin, iv:b64e(iv), ct:b64e(ct)};
+  return {id:pwEntry.id, label:pwEntry.label, u:pwEntry.u||null, until:pwEntry.until||null, admin:!!pwEntry.admin, iv:b64e(iv), ct:b64e(ct)};
 }
 async function createVault(pwList){
   vaultSalt=rnd(16);
@@ -1549,11 +1553,14 @@ async function envelope(){
   return {app:"BCSA CRM",v:3,enc:"AES-GCM-256",salt:b64e(vaultSalt),wraps:vaultWraps,iv:b64e(iv),data:b64e(ct),saved:new Date().toISOString()};
 }
 /* Επιστρέφει {db, dekRaw, salt, wraps, matched} ή null */
-async function openEnvelope(env,pw){
+async function openEnvelope(env,pw,uname){
   if(!env||!env.wraps||!(env.v===2||env.v===3)) return null;
   const salt=b64d(env.salt), kek=await deriveKEK(pw,salt);
+  const un=(uname||"").trim().toLowerCase();
+  const tryWraps=un?env.wraps.filter(w=>(w.u||"").toLowerCase()===un):env.wraps;
+  if(un&&!tryWraps.length) return null;                 // δόθηκε όνομα που δεν υπάρχει
   let raw=null, matched=null;
-  for(const w of env.wraps){
+  for(const w of tryWraps){
     try{ raw=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct))); matched=w; break; }catch(e){}
   }
   if(!raw) return null;
@@ -2289,11 +2296,12 @@ function renderPwAdmin(){
   const wrap=$("#admPwPanel"), box=$("#pwAdmin"); if(!box) return;
   if(!isAdmin()){ wrap.style.display="none"; return; } wrap.style.display="";
   box.innerHTML=`
-    <table><thead><tr><th>Ετικέτα / Χρήστης</th><th>Ρόλος</th><th>Λήξη</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
+    <table><thead><tr><th>Ετικέτα / Χρήστης</th><th>Όνομα χρήστη</th><th>Ρόλος</th><th>Λήξη</th><th>Κατάσταση</th><th></th></tr></thead><tbody>${
       vaultWraps.map(w=>{
         const exp=w.until&&todayISO()>w.until;
         return `<tr>
           <td class="name">${esc(w.label||w.id)}</td>
+          <td class="mono">${w.u?esc(w.u):'<span class="muted">—</span>'}</td>
           <td>${w.admin?'<span class="pill p-sched">Διαχειριστής</span>':'<span class="muted">Χρήστης</span>'}</td>
           <td class="mono">${w.until?grDate(w.until):"—"}</td>
           <td>${exp?'<span class="pill p-canc">Έληξε</span>':'<span class="pill p-done">Ενεργός</span>'}</td>
@@ -2306,24 +2314,29 @@ function renderPwAdmin(){
     <div style="border-top:1px solid var(--line-2);margin-top:14px;padding-top:14px">
       <div class="sec-t">Προσθήκη νέου κωδικού</div>
       <div class="two"><div class="field" style="margin:0"><label>Ετικέτα (π.χ. υποκατάστημα)</label><input id="npLabel" placeholder="π.χ. Καβάλα"></div>
-        <div class="field" style="margin:0"><label>Κωδικός</label>${pwField("npPass","κωδικός εισόδου")}</div></div>
+        <div class="field" style="margin:0"><label>Όνομα χρήστη (προαιρετικό)</label><input id="npUser" placeholder="π.χ. kavala" autocomplete="off"></div></div>
+      <div class="two" style="margin-top:11px"><div class="field" style="margin:0"><label>Κωδικός</label>${pwField("npPass","κωδικός εισόδου")}</div>
+        <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="npUntil" type="date"></div></div>
       <div class="two" style="margin-top:11px;align-items:end">
-        <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="npUntil" type="date"></div>
+        <p class="muted" style="margin:0">Με όνομα χρήστη, ο ίδιος κωδικός μπορεί να δοθεί σε περισσότερους από έναν χρήστες. Χωρίς όνομα, ο κωδικός πρέπει να είναι μοναδικός.</p>
         <button class="btn brass" id="npAdd">Προσθήκη κωδικού</button>
       </div>
     </div>
     <p class="muted" style="margin-top:10px">Οι κωδικοί κρυπτογραφούνται και ξεκλειδώνουν την ίδια βάση. Ο νέος χρήστης βλέπει <b>μόνο τα δικά του</b> δεδομένα· ο διαχειριστής έχει πρόσβαση σε όλα από την «Εποπτεία χρηστών».</p>`;
   wirePwEyes(box);
   $("#npAdd").onclick=async()=>{
-    const label=$("#npLabel").value.trim()||"Χρήστης", pass=$("#npPass").value.trim(), until=$("#npUntil").value||null;
+    const label=$("#npLabel").value.trim()||"Χρήστης", uName=$("#npUser").value.trim(), pass=$("#npPass").value.trim(), until=$("#npUntil").value||null;
     if(pass.length<4){ toast("Κωδικός τουλάχιστον 4 χαρακτήρων.",true); return; }
-    if(vaultWraps.length){
-      // έλεγχος διπλότυπου κωδικού
-      for(const w of vaultWraps){ try{ const kek=await deriveKEK(pass,vaultSalt); await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct)); toast("Ο κωδικός χρησιμοποιείται ήδη.",true); return; }catch(e){} }
+    if(uName){
+      // έλεγχος μοναδικότητας ονόματος χρήστη (χωρίς διάκριση πεζών/κεφαλαίων)
+      if(vaultWraps.some(w=>(w.u||"").toLowerCase()===uName.toLowerCase())){ toast("Το όνομα χρήστη χρησιμοποιείται ήδη.",true); return; }
+    }else if(vaultWraps.length){
+      // χωρίς όνομα χρήστη: ο κωδικός πρέπει να είναι μοναδικός (η ταυτότητα βγαίνει από αυτόν)
+      for(const w of vaultWraps){ try{ const kek=await deriveKEK(pass,vaultSalt); await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(w.iv)},kek,b64d(w.ct)); toast("Ο κωδικός χρησιμοποιείται ήδη — δώστε όνομα χρήστη ή άλλον κωδικό.",true); return; }catch(e){} }
     }
     const id="u_"+uid();
-    vaultWraps.push(await wrapFor({id,label,p:pass,until,admin:false},vaultSalt,dekRaw));
-    logIt(`Προσθήκη κωδικού χρήστη: ${label}${until?` (λήξη ${grDate(until)})`:""}`,"sys","");
+    vaultWraps.push(await wrapFor({id,label,u:uName||null,p:pass,until,admin:false},vaultSalt,dekRaw));
+    logIt(`Προσθήκη κωδικού χρήστη: ${label}${uName?` (όνομα: ${uName})`:""}${until?` (λήξη ${grDate(until)})`:""}`,"sys","");
     await persist(); toast("Ο κωδικός προστέθηκε.");
   };
 }
@@ -2334,6 +2347,7 @@ function pwEditDialog(id){
     <div class="modal-h"><div><h3>Αλλαγή κωδικού</h3><div class="muted">${esc(w.label||w.id)}</div></div><button class="btn ghost sm" id="peX">✕</button></div>
     <div class="modal-b">
       <div class="field" style="margin:0"><label>Ετικέτα</label><input id="peLabel" value="${esc(w.label||"")}"></div>
+      <div class="field" style="margin:0"><label>Όνομα χρήστη (προαιρετικό)</label><input id="peUser" value="${esc(w.u||"")}" autocomplete="off"></div>
       <div class="field" style="margin:0"><label>Νέος κωδικός (κενό = χωρίς αλλαγή)</label>${pwField("pePass","••••••••")}</div>
       <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="peUntil" type="date" value="${w.until||""}"></div>
       <div id="peErr"></div>
@@ -2343,11 +2357,14 @@ function pwEditDialog(id){
   $("#peX").onclick=closeModal; $("#peCancel").onclick=closeModal;
   wirePwEyes($("#modal"));
   $("#peSave").onclick=async()=>{
-    const label=$("#peLabel").value.trim()||w.label, until=$("#peUntil").value||null, pass=$("#pePass").value.trim();
-    w.label=label; w.until=until;
+    const label=$("#peLabel").value.trim()||w.label, until=$("#peUntil").value||null, pass=$("#pePass").value.trim(), uName=$("#peUser").value.trim();
+    if(uName&&vaultWraps.some(x=>x.id!==w.id&&(x.u||"").toLowerCase()===uName.toLowerCase())){
+      $("#peErr").innerHTML='<div class="flag bad"><span>!</span><span>Το όνομα χρήστη χρησιμοποιείται ήδη από άλλον.</span></div>'; return;
+    }
+    w.label=label; w.until=until; w.u=uName||null;
     if(pass){
       if(pass.length<4){ $("#peErr").innerHTML='<div class="flag bad"><span>!</span><span>Κωδικός τουλάχιστον 4 χαρακτήρων.</span></div>'; return; }
-      const nw=await wrapFor({id:w.id,label,p:pass,until,admin:w.admin},vaultSalt,dekRaw);
+      const nw=await wrapFor({id:w.id,label,u:uName||null,p:pass,until,admin:w.admin},vaultSalt,dekRaw);
       Object.assign(w,nw);
       if(w.id===currentUser.id) sessionPw=pass;
     }
@@ -2717,7 +2734,7 @@ function sendCV(reqId){
     const to=encodeURIComponent(prof().email||"");
     const su=encodeURIComponent(`Βιογραφικά για θέση: ${r.position}`);
     const bo=encodeURIComponent(`Σχετικά με το αίτημά σας για «${r.position}» (${EMP_TYPE[r.type]}):\n\nΣύνδεσμος: ${$("#cvLink").value}\n\n${$("#cvNote").value}\n\nΜε εκτίμηση,\nΕυάγγελος Γκούλιος — Business Consultancy Academy`);
-    window.open(m.u(to,su,bo),"_blank");
+    openTab(m.u(to,su,bo));
     await doNotify(); closeModal(); toast("Άνοιξε το μήνυμα.");
   });
 }
@@ -3287,6 +3304,15 @@ function openEmpInfo(id){
 }
 
 /* ---------- 7b. EMAIL ---------- */
+/* Άνοιγμα νέας καρτέλας με τρόπο φιλικό προς τα popup blockers (μέσω προσωρινού <a>) */
+function openTab(url){
+  try{
+    const a=document.createElement("a");
+    a.href=url; a.target="_blank"; a.rel="noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }catch(e){ const w=window.open(url,"_blank"); return !!w; }
+}
 const MAILERS=[
   {k:"gmail",   n:"Gmail",                     u:(to,su,bo)=>`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${bo}`},
   {k:"yahoo",   n:"Yahoo Mail",                u:(to,su,bo)=>`https://compose.mail.yahoo.com/?to=${to}&subject=${su}&body=${bo}`},
@@ -3363,7 +3389,7 @@ function mailDialog(c,a){
       const m=MAILERS.find(x=>x.k===btn.dataset.mailer);
       const to=encodeURIComponent(c.email), su=encodeURIComponent($("#mlSub").value), bo=encodeURIComponent($("#mlBody").value);
       try{ localStorage.setItem("bcsa-mailer",m.k); }catch(e){}
-      window.open(m.u(to,su,bo), "_blank");
+      openTab(m.u(to,su,bo));
       if(c.id) logIt(`Email προς ${c.name} (${c.email}) μέσω ${m.n}${$("#mlSub").value?` — Θέμα: ${$("#mlSub").value}`:""}`,"manual",c.name);
       closeModal();
       await persist();
@@ -3512,10 +3538,11 @@ function showGate(){
   inp.focus();
   const tryIn=async()=>{
     const pw=inp.value;
+    const un=($("#gUser")&&$("#gUser").value)?$("#gUser").value.trim():"";
     if(!pw){ return; }
     $("#gErr").innerHTML='<div class="flag match"><span>⏳</span><span>Έλεγχος & αποκρυπτογράφηση…</span></div>';
     $("#gGo").disabled=true;
-    const res=await unlockApp(pw);
+    const res=await unlockApp(pw,un);
     $("#gGo").disabled=false;
     if(res.err){ $("#gErr").innerHTML=`<div class="flag bad"><span>!</span><span>${esc(res.err)}</span></div>`; inp.value=""; inp.focus(); return; }
     if(currentUser&&currentUser.until) toast(`Προσωρινός κωδικός — ισχύει έως ${grDate(currentUser.until)}.`);
@@ -3525,6 +3552,7 @@ function showGate(){
   };
   $("#gGo").onclick=tryIn;
   inp.onkeydown=e=>{ if(e.key==="Enter") tryIn(); };
+  const gu=$("#gUser"); if(gu) gu.onkeydown=e=>{ if(e.key==="Enter"){ inp.focus(); } };
   const info=$("#gInfo"); if(info) info.onclick=openTerms;
 }
 
@@ -3562,7 +3590,7 @@ function openTerms(){
   else{ const b=new Blob([html],{type:"text/html"}); window.open(URL.createObjectURL(b),"_blank"); }
 }
 /* Επιστρέφει {ok:true} ή {err:"..."} */
-async function unlockApp(pw){
+async function unlockApp(pw,uname){
   try{
     sessionPw=pw;
     Store.init();
@@ -3570,8 +3598,8 @@ async function unlockApp(pw){
 
     // Υπάρχον κρυπτογραφημένο vault (v2 ή v3)
     if(raw&&(raw.v===2||raw.v===3)){
-      const r=await openEnvelope(raw,pw);
-      if(!r) return {err:"Λανθασμένος κωδικός ή αδυναμία αποκρυπτογράφησης."};
+      const r=await openEnvelope(raw,pw,uname);
+      if(!r) return {err:uname?"Λανθασμένο όνομα χρήστη ή κωδικός.":"Λανθασμένος κωδικός ή αδυναμία αποκρυπτογράφησης."};
       dekKey=r.key; dekRaw=r.dekRaw; vaultSalt=r.salt; vaultWraps=r.wraps;
 
       // Migration v2 → v3: προσθήκη metadata κωδικών + owners
@@ -4348,7 +4376,22 @@ function bind(){
     await persist(); toast("Η βάση εκκαθαρίστηκε.");
   };
 
-  $("#syncChip").onclick=()=>{ if(!FS_OK){ go("data"); return; } enableSync(); };
+  $("#syncChip").onclick=()=>{
+    if(!FS_OK){ go("data"); return; }
+    if(syncOn){
+      if(confirm("Ο αυτόματος συγχρονισμός Excel στον φάκελο είναι ενεργός.\n\nΝα απενεργοποιηθεί; (Τα αρχεία που έχουν ήδη γραφτεί στον φάκελο παραμένουν — απλώς θα σταματήσουν να ενημερώνονται.)")){
+        syncOn=false; updateChip(); renderSync(); toast("Ο συγχρονισμός Excel απενεργοποιήθηκε.");
+      }
+      return;
+    }
+    enableSync();
+  };
+  $("#cloudChip").onclick=()=>{
+    if(CLOUD.dirty){ alert("☁ Εκκρεμεί αποστολή: υπάρχουν αλλαγές που δεν έχουν σταλεί ακόμη στο cloud (πιθανόν λόγω σύνδεσης). Θα σταλούν αυτόματα μόλις αποκατασταθεί — ή δοκιμάστε ξανά σε λίγο."); CLOUD.retry(); return; }
+    if(CLOUD.state==="online"){ alert("☁ Cloud ενεργό: τα δεδομένα αποθηκεύονται κρυπτογραφημένα στη βάση cloud και είναι διαθέσιμα από κάθε συσκευή και browser με τους κωδικούς σας. Η ένδειξη αυτή είναι ενημερωτική — το cloud είναι πλέον η κύρια αποθήκη και δεν απενεργοποιείται."); return; }
+    if(CLOUD.state==="empty"){ alert("☁ Η βάση cloud είναι κενή. Τα δεδομένα θα ανέβουν με την πρώτη αποθήκευση, ή μέσω της ερώτησης μεταφοράς."); return; }
+    alert("☁ Εκτός σύνδεσης: το πρόγραμμα δουλεύει με τα τοπικά δεδομένα της συσκευής. Οι αλλαγές θα συγχρονιστούν αυτόματα μόλις επανέλθει η σύνδεση με το internet (ή ελέγξτε στο supabase.com μήπως το project έχει παύσει λόγω αδράνειας).");
+  };
   $$(".tab").forEach(t=>t.addEventListener("click",()=>go(t.dataset.view)));
   $("#back").addEventListener("click",e=>{ if(e.target.id==="back") closeModal(); });
   document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
@@ -4547,7 +4590,7 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="4.5";
+const APP_VERSION="4.6";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
