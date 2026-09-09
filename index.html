@@ -744,7 +744,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.5 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.7 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1564,7 +1564,7 @@ async function deriveKEK(pw,salt){
 async function wrapFor(pwEntry,salt,dek){
   const kek=await deriveKEK(pwEntry.p,salt), iv=rnd(12);
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},kek,dek));
-  return {id:pwEntry.id, label:pwEntry.label, u:pwEntry.u||null, until:pwEntry.until||null, admin:!!pwEntry.admin, iv:b64e(iv), ct:b64e(ct)};
+  return {id:pwEntry.id, label:pwEntry.label, u:pwEntry.u||null, until:pwEntry.until||null, admin:!!pwEntry.admin, perm:pwEntry.perm||null, iv:b64e(iv), ct:b64e(ct)};
 }
 async function createVault(pwList){
   vaultSalt=rnd(16);
@@ -1730,7 +1730,7 @@ async function pickFolder(){
     const root=await window.showDirectoryPicker({mode:"readwrite"});
     dirHandle=await root.getDirectoryHandle(FOLDER,{create:true});
     await IDB.set("dir",dirHandle);
-    syncOn=true; await syncNow(true);
+    syncOn=true; IDB.set("syncPref",true); await syncNow(true);
     toast("Ο φάκελος συνδέθηκε. Το Excel ενημερώνεται αυτόματα.");
   }catch(e){ if(e&&e.name!=="AbortError") toast("Δεν ήταν δυνατή η σύνδεση φακέλου.",true); }
   renderSync();
@@ -1739,7 +1739,7 @@ async function enableSync(){
   if(!dirHandle) return pickFolder();
   try{
     const p=await dirHandle.requestPermission({mode:"readwrite"});
-    if(p==="granted"){ syncOn=true; await syncNow(true); toast("Ο συγχρονισμός ενεργοποιήθηκε."); }
+    if(p==="granted"){ syncOn=true; IDB.set("syncPref",true); await syncNow(true); toast("Ο συγχρονισμός ενεργοποιήθηκε."); }
     else toast("Η άδεια δεν δόθηκε.",true);
   }catch(e){ dirHandle=null; toast("Ο φάκελος δεν είναι προσβάσιμος — επιλέξτε ξανά.",true); }
   renderSync();
@@ -1791,7 +1791,7 @@ async function persist(){
   try{ await Store.saveRaw(await envelope()); }catch(e){ toast("Σφάλμα κρυπτογράφησης — τα δεδομένα ΔΕΝ αποθηκεύτηκαν.",true); }
   renderAll(); queueSync();
 }
-function logIt(text,kind,client){ DB.history.unshift({id:uid(),ts:Date.now(),text,kind:kind||"auto",client:client||""}); if(DB.history.length>1000) DB.history.length=1000; }
+function logIt(text,kind,client){ DB.history.unshift({id:uid(),ts:Date.now(),owner:curUid(),text,kind:kind||"auto",client:client||""}); if(DB.history.length>1000) DB.history.length=1000; }
 
 function updateChip(){
   const c=$("#syncChip"), t=$("#syncTxt"); if(!c||!t) return;
@@ -2119,7 +2119,38 @@ function renderClients(){
       </td></tr>`;
   }).join("")}</tbody></table>`;
 }
-const filteredHist=()=>{ const q=nz($("#qHist").value); return DB.history.filter(h=>!q||nz(h.text+" "+(h.client||"")).includes(q)); };
+const filteredHist=()=>{ const q=nz($("#qHist").value); return DB.history.filter(h=>inScope(h.owner||"u_admin")).filter(h=>!q||nz(h.text+" "+(h.client||"")).includes(q)); };
+const PERM_DEFS=[
+  {k:"history", n:"Ιστορικό"},
+  {k:"day",     n:"Ημερήσιο"},
+  {k:"week",    n:"Εβδομαδιαίο"},
+  {k:"month",   n:"Μηνιαίο"},
+  {k:"staff",   n:"Ζήτηση προσωπικού & CV"},
+  {k:"shifts",  n:"Βάρδιες & πρόγραμμα εργασίας"},
+  {k:"report",  n:"Αναφορά προβλήματος"},
+  {k:"graphics",n:"Γραφιστικά"},
+  {k:"system",  n:"Καρτέλα «Σύστημα»"}
+];
+function canSee(k){
+  if(!currentUser) return false;
+  if(isAdmin()) return true;
+  const p=currentUser.perm;
+  if(!p||typeof p!=="object") return true;      // παλιοί χρήστες χωρίς ορισμό = πλήρης πρόσβαση
+  return p[k]!==false;
+}
+function permGridHtml(pref,p){
+  const v=k=>!p||p[k]!==false;
+  return `<div class="svc" style="margin:0">${PERM_DEFS.map(d=>`<label class="${v(d.k)?"sel":""}"><input type="checkbox" data-permk="${d.k}" id="${pref}_${d.k}" ${v(d.k)?"checked":""}> ${esc(d.n)}</label>`).join("")}</div>
+  <p class="muted" style="margin:6px 0 0">Η καρτέλα «Πελάτες &amp; Ραντεβού» είναι πάντα ορατή. Ξετσεκάρετε ό,τι ΔΕΝ πρέπει να βλέπει ο χρήστης.</p>`;
+}
+function permCollect(root){
+  const p={};
+  root.querySelectorAll("[data-permk]").forEach(c=>{ p[c.dataset.permk]=c.checked; });
+  return p;
+}
+function wirePermGrid(root){
+  root.querySelectorAll("[data-permk]").forEach(c=>c.addEventListener("change",()=>{ c.closest("label").classList.toggle("sel",c.checked); }));
+}
 function renderHistory(){
   const rows=filteredHist();
   if(!rows.length){ $("#histList").innerHTML='<div class="empty"><strong>Κενό ιστορικό</strong>Κάθε νέο ραντεβού γράφεται εδώ αυτόματα.</div>'; return; }
@@ -2284,7 +2315,7 @@ function renderStats(){
     <div class="stat"><div class="v mono" style="font-size:20px">${eur(A.filter(a=>!a.paid&&a.status!=="cancelled").reduce((s,a)=>s+num(a.cost),0))}</div><div class="l">Εκκρεμείς πληρωμές</div></div>`;
   $("#dbStamp").textContent=DB.updated?"Τελευταία ενημέρωση: "+stamp(DB.updated):"Καμία εγγραφή ακόμη";
   $("#nClients").textContent=mineC().length;
-  $("#nHist").textContent=DB.history.length;
+  $("#nHist").textContent=DB.history.filter(x=>inScope(x.owner||"u_admin")).length;
 }
 function renderBiz(){
   const el=$("#bizBox"); if(!el) return;
@@ -2377,13 +2408,15 @@ function renderPwAdmin(){
         <div class="field" style="margin:0"><label>Email</label><input id="npEmail"></div></div>
       <div class="two" style="margin-top:11px"><div class="field" style="margin:0"><label>Διεύθυνση</label><input id="npAddr"></div>
         <div class="field" style="margin:0"><label>ΑΦΜ</label><input id="npAfm"></div></div>
+      <div class="sec-t" style="margin-top:16px">Τι θα βλέπει ο χρήστης</div>
+      <div id="npPerm">${permGridHtml("np",null)}</div>
       <div class="two" style="margin-top:11px;align-items:end">
         <p class="muted" style="margin:0">Ο νέος χρήστης θα βρει έτοιμες τις υπηρεσίες του τύπου του και τα στοιχεία της επιχείρησής του — μπαίνει και δουλεύει αμέσως. Με όνομα χρήστη, ο ίδιος κωδικός μπορεί να δοθεί σε περισσότερους.</p>
         <button class="btn brass" id="npAdd">Δημιουργία χρήστη</button>
       </div>
     </div>
     <p class="muted" style="margin-top:10px">Οι κωδικοί κρυπτογραφούνται και ξεκλειδώνουν την ίδια βάση. Ο νέος χρήστης βλέπει <b>μόνο τα δικά του</b> δεδομένα· ο διαχειριστής έχει πρόσβαση σε όλα από την «Εποπτεία χρηστών».</p>`;
-  wirePwEyes(box);
+  wirePwEyes(box); wirePermGrid($("#npPerm"));
   let npLogoData="";
   { const f=$("#npLogo"); if(f) f.onchange=e=>{ const file=e.target.files[0]; if(!file) return;
       if(file.size>1500000){ toast("Μεγάλο αρχείο — μικρότερη εικόνα.",true); return; }
@@ -2394,7 +2427,8 @@ function renderPwAdmin(){
     if(pass.length<4){ toast("Κωδικός τουλάχιστον 4 χαρακτήρων.",true); return; }
     if(vaultWraps.some(w=>(w.u||"").toLowerCase()===uName.toLowerCase())){ toast("Το όνομα χρήστη χρησιμοποιείται ήδη.",true); return; }
     const id="u_"+uid(), type=$("#npType").value;
-    vaultWraps.push(await wrapFor({id,label,u:uName,p:pass,until,admin:false},vaultSalt,dekRaw));
+    const perm=permCollect($("#npPerm"));
+    vaultWraps.push(await wrapFor({id,label,u:uName,p:pass,until,admin:false,perm},vaultSalt,dekRaw));
     DB.profiles[id]=Object.assign({},DEF_PROFILE,{
       setup:true, type, brand:$("#npBrand").value.trim()||label, tagline:$("#npTag").value.trim(),
       logo:npLogoData, phone:$("#npPhone").value.trim(), email:$("#npEmail").value.trim(),
@@ -2415,21 +2449,23 @@ function pwEditDialog(id){
       <div class="field" style="margin:0"><label>Όνομα χρήστη (προαιρετικό)</label><input id="peUser" value="${esc(w.u||"")}" autocomplete="off"></div>
       <div class="field" style="margin:0"><label>Νέος κωδικός (κενό = χωρίς αλλαγή)</label>${pwField("pePass","••••••••")}</div>
       <div class="field" style="margin:0"><label>Ημερομηνία λήξης (κενό = μόνιμος)</label><input id="peUntil" type="date" value="${w.until||""}"></div>
+      ${w.admin?"":`<div class="field" style="margin:0"><label>Τι βλέπει ο χρήστης</label><div id="pePerm">${permGridHtml("pe",w.perm)}</div></div>`}
       <div id="peErr"></div>
       <div class="row-end"><button class="btn ghost" id="peCancel">Άκυρο</button><button class="btn brass" id="peSave">Αποθήκευση</button></div>
     </div>`;
   $("#back").classList.add("on");
   $("#peX").onclick=closeModal; $("#peCancel").onclick=closeModal;
-  wirePwEyes($("#modal"));
+  wirePwEyes($("#modal")); if($("#pePerm")) wirePermGrid($("#pePerm"));
   $("#peSave").onclick=async()=>{
     const label=$("#peLabel").value.trim()||w.label, until=$("#peUntil").value||null, pass=$("#pePass").value.trim(), uName=$("#peUser").value.trim();
     if(uName&&vaultWraps.some(x=>x.id!==w.id&&(x.u||"").toLowerCase()===uName.toLowerCase())){
       $("#peErr").innerHTML='<div class="flag bad"><span>!</span><span>Το όνομα χρήστη χρησιμοποιείται ήδη από άλλον.</span></div>'; return;
     }
     w.label=label; w.until=until; w.u=uName||null;
+    if(!w.admin&&$("#pePerm")) w.perm=permCollect($("#pePerm"));
     if(pass){
       if(pass.length<4){ $("#peErr").innerHTML='<div class="flag bad"><span>!</span><span>Κωδικός τουλάχιστον 4 χαρακτήρων.</span></div>'; return; }
-      const nw=await wrapFor({id:w.id,label,u:uName||null,p:pass,until,admin:w.admin},vaultSalt,dekRaw);
+      const nw=await wrapFor({id:w.id,label,u:uName||null,p:pass,until,admin:w.admin,perm:w.perm||null},vaultSalt,dekRaw);
       Object.assign(w,nw);
       if(w.id===currentUser.id) sessionPw=pass;
     }
@@ -3287,7 +3323,24 @@ function renderStaffCounts(){
   const n = isAdmin() ? DB.staffReq.filter(r=>r.status!=="done").length : 0;
   const el=$("#nStaff"); if(el) el.textContent=n?String(n):"";
 }
-function renderTabs(){ const t=$("#tabData"); if(!t||!currentUser) return; t.innerHTML=isAdmin()?"Δεδομένα &amp; Excel":"Σύστημα"; }
+function renderTabs(){
+  if(!currentUser) return;
+  const t=$("#tabData"); if(t) t.innerHTML=isAdmin()?"Δεδομένα &amp; Excel":"Σύστημα";
+  const show=(v,ok)=>{ const b=document.querySelector(`.tab[data-view="${v}"]`); if(b) b.style.display=ok?"":"none"; };
+  show("history",canSee("history"));
+  show("day",canSee("day")); show("week",canSee("week")); show("month",canSee("month"));
+  show("staff",canSee("staff")||canSee("shifts")||canSee("report"));
+  show("graphics",canSee("graphics"));
+  show("data",isAdmin()||canSee("system"));
+  permApplyStaff();
+}
+function permApplyStaff(){
+  const grp=(innerId,ok)=>{ const el=$("#"+innerId); if(!el) return; const pn=el.closest(".panel"); if(pn) pn.style.display=ok?"":"none"; };
+  const sh=canSee("shifts");
+  grp("myReqList",canSee("staff"));
+  grp("hoursBox",sh); grp("empList",sh); grp("shiftDefBox",sh); grp("needsBox",sh); grp("shiftBox",sh);
+  grp("rptText",canSee("report"));
+}
 function renderAll(){ renderTabs(); renderScopeBar(); renderAppts(); renderClients(); renderHistory(); renderMoney(); renderDay(); renderWeek(); renderMonth(); renderStats(); renderSvcAdmin(); renderBiz(); renderPwAdmin(); renderUsers(); renderReqAdmin(); renderMyReq(); renderReportsAdmin(); renderMyReports(); renderHours(); renderEmp(); renderShiftDef(); renderNeeds(); renderShift(); renderStaffCounts(); renderBell(); updateChip(); updateNotifChip(); }
 
 /* ---------- 7. ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ---------- */
@@ -3682,7 +3735,7 @@ async function unlockApp(pw,uname){
       // v3: εύρεση του wrap που άνοιξε → ρόλος & λήξη
       const w=r.matched;
       if(w.until && todayISO()>w.until) return {err:`Ο κωδικός «${w.label||""}» έληξε στις ${grDate(w.until)}.`};
-      currentUser={id:w.id,label:w.label,admin:!!w.admin,until:w.until||null};
+      currentUser={id:w.id,label:w.label,admin:!!w.admin,until:w.until||null,perm:w.perm||null};
       DB=norm(r.db);
       return {ok:true};
     }
@@ -4415,6 +4468,10 @@ function gfxInit(){
 
 /* ---------- 8. NAV ---------- */
 function go(v){
+  const allow={history:canSee("history"),day:canSee("day"),week:canSee("week"),month:canSee("month"),
+    staff:canSee("staff")||canSee("shifts")||canSee("report"),graphics:canSee("graphics"),
+    data:isAdmin()||canSee("system")};
+  if(allow[v]===false){ toast("Δεν έχετε πρόσβαση σε αυτή την ενότητα.",true); return; }
   if(v==="data"&&!dataPassOK){ askPass(); return; }
   $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.view===v));
   $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));
@@ -4520,7 +4577,7 @@ function bind(){
     if(!FS_OK){ go("data"); return; }
     if(syncOn){
       if(confirm("Ο αυτόματος συγχρονισμός Excel στον φάκελο είναι ενεργός.\n\nΝα απενεργοποιηθεί; (Τα αρχεία που έχουν ήδη γραφτεί στον φάκελο παραμένουν — απλώς θα σταματήσουν να ενημερώνονται.)")){
-        syncOn=false; updateChip(); renderSync(); toast("Ο συγχρονισμός Excel απενεργοποιήθηκε.");
+        syncOn=false; IDB.set("syncPref",false); updateChip(); renderSync(); toast("Ο συγχρονισμός Excel απενεργοποιήθηκε.");
       }
       return;
     }
@@ -4730,7 +4787,7 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="4.8";
+const APP_VERSION="5.0";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
@@ -4755,7 +4812,8 @@ async function startApp(){
     const h=await IDB.get("dir");
     if(h){
       dirHandle=h;
-      try{ if(await h.queryPermission({mode:"readwrite"})==="granted") syncOn=true; }catch(e){}
+      const pref=await IDB.get("syncPref");                 // ρητή επιλογή χρήστη (v6.7)
+      try{ if(pref===true && await h.queryPermission({mode:"readwrite"})==="granted") syncOn=true; }catch(e){}
     }
   }
   bind();
@@ -4791,10 +4849,8 @@ async function startApp(){
     DB.profile.setup=true;
     try{ await Store.saveRaw(await envelope()); }catch(e){}
   }
-  if(FS_OK){
-    if(!dirHandle) setTimeout(()=>showSetup(false),350);
-    else if(!syncOn) setTimeout(()=>showSetup(true),350);
-  }
+  /* v6.7: Χωρίς αυτόματο παράθυρο Excel στην εκκίνηση. Πρώτη εικόνα: ☁ πράσινο, Excel κίτρινο.
+     Η σύνδεση φακέλου Excel γίνεται ΜΟΝΟ με ενέργεια του χρήστη (κλικ στο chip ή από Δεδομένα & Excel). */
 }
 
 try{ showGate(); }
