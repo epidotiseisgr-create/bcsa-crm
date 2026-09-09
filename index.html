@@ -287,6 +287,7 @@
       <button class="chip" id="dlChip" title="Λήψη αντιγράφου ασφαλείας (.json)">⬇ Λήψη</button>
       <button class="chip" id="bellChip" title="Ειδοποιήσεις"><span id="bellIco">🔔</span><span id="bellBadge" class="bellbadge"></span></button>
       <button class="chip" id="logoutChip" title="Αποσύνδεση">⎋ Έξοδος</button>
+      <button class="chip" id="cloudChip" title="Κατάσταση σύνδεσης με τη βάση cloud"><i></i><span id="cloudTxt">☁ …</span></button>
       <button class="chip" id="syncChip"><i></i><span id="syncTxt">Φόρτωση…</span></button>
       <button class="chip" id="notifChip"><i></i><span id="notifTxt">Ειδοποιήσεις</span></button>
     </div>
@@ -723,7 +724,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.1 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.2 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1568,26 +1569,117 @@ async function rewrapAll(pwList){
   for(const L of pwList) vaultWraps.push(await wrapFor(L,vaultSalt,dekRaw));
 }
 
+/* ---------- CLOUD (Supabase) — κύρια αποθήκη v6.2 ----------
+   Στο cloud ταξιδεύει ΜΟΝΟ το κρυπτογραφημένο πακέτο (envelope v3).
+   Η αποκρυπτογράφηση γίνεται πάντα τοπικά, με τον κωδικό του χρήστη. */
+const CLOUD={
+  url:"https://glqwidlnwtofxpndvydr.supabase.co",
+  key:"sb_publishable_tEniZ8JrkA7puvCaBzZxAA_BGUN8yNO",
+  row:"main",
+  ver:0,               // τελευταία γνωστή έκδοση γραμμής στο cloud
+  state:"init",        // online | offline | empty | init
+  dirty:false,         // εκκρεμεί αποστολή προς cloud
+  pending:null,        // τελευταίο πακέτο που δεν στάλθηκε
+  migrAsked:false,
+  hdr(extra){ return Object.assign({"apikey":this.key,"Authorization":"Bearer "+this.key,"Content-Type":"application/json"},extra||{}); },
+  async _fetch(u,opt,ms){
+    const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms||8000);
+    try{ const r=await fetch(u,Object.assign({},opt,{signal:c.signal})); clearTimeout(t); return r; }
+    catch(e){ clearTimeout(t); return null; }
+  },
+  /* Επιστρέφει: object=υπάρχει, null=κενή βάση cloud, undefined=χωρίς σύνδεση */
+  async pull(){
+    const r=await this._fetch(this.url+"/rest/v1/vault?id=eq."+this.row+"&select=data,ver",{headers:this.hdr()});
+    if(!r||!r.ok){ if(this.state!=="empty") this.state="offline"; setCloudChip(); return undefined; }
+    let a=[]; try{ a=await r.json(); }catch(e){}
+    if(!a.length){ this.state="empty"; this.ver=0; setCloudChip(); return null; }
+    this.state="online"; this.ver=a[0].ver||1; setCloudChip();
+    return a[0].data;
+  },
+  /* Ελαφρύς έλεγχος: μόνο η έκδοση (ver). true=υπάρχει νεότερο στο cloud */
+  async peek(){
+    const r=await this._fetch(this.url+"/rest/v1/vault?id=eq."+this.row+"&select=ver",{headers:this.hdr()},6000);
+    if(!r||!r.ok){ if(this.state!=="empty") this.state="offline"; setCloudChip(); return false; }
+    let a=[]; try{ a=await r.json(); }catch(e){}
+    if(!a.length){ this.state="empty"; setCloudChip(); return false; }
+    const newer=(a[0].ver||0)>this.ver;
+    this.state="online"; setCloudChip();
+    return newer;
+  },
+  async push(obj){
+    this.pending=obj;
+    try{
+      if(this.state==="empty"||this.ver===0){
+        const r=await this._fetch(this.url+"/rest/v1/vault",{method:"POST",headers:this.hdr({"Prefer":"return=representation,resolution=merge-duplicates"}),body:JSON.stringify({id:this.row,data:obj,ver:1})});
+        if(!r||!r.ok) throw 0;
+        this.state="online"; this.ver=1; this.dirty=false; this.pending=null; setCloudChip(); return true;
+      }
+      /* Αισιόδοξο κλείδωμα: γράφουμε μόνο πάνω στην έκδοση που ξέρουμε */
+      let r=await this._fetch(this.url+"/rest/v1/vault?id=eq."+this.row+"&ver=eq."+this.ver,{method:"PATCH",headers:this.hdr({"Prefer":"return=representation"}),body:JSON.stringify({data:obj,ver:this.ver+1,updated_at:new Date().toISOString()})});
+      let a=(r&&r.ok)?await r.json():[];
+      if(a.length){ this.ver=a[0].ver; this.state="online"; this.dirty=false; this.pending=null; setCloudChip(); return true; }
+      /* Σύγκρουση: κάποια άλλη συσκευή έγραψε στο μεταξύ. Διαβάζουμε τη νέα έκδοση
+         και ξαναγράφουμε (επικρατεί η τρέχουσα ενεργή επεξεργασία) — μία επανάληψη. */
+      const g=await this._fetch(this.url+"/rest/v1/vault?id=eq."+this.row+"&select=ver",{headers:this.hdr()});
+      let b=(g&&g.ok)?await g.json():[];
+      if(!b.length) throw 0;
+      this.ver=b[0].ver||1;
+      r=await this._fetch(this.url+"/rest/v1/vault?id=eq."+this.row+"&ver=eq."+this.ver,{method:"PATCH",headers:this.hdr({"Prefer":"return=representation"}),body:JSON.stringify({data:obj,ver:this.ver+1,updated_at:new Date().toISOString()})});
+      a=(r&&r.ok)?await r.json():[];
+      if(!a.length) throw 0;
+      this.ver=a[0].ver; this.state="online"; this.dirty=false; this.pending=null; setCloudChip();
+      toast("Προσοχή: γράφατε ταυτόχρονα από δύο συσκευές — κρατήθηκαν οι τελευταίες αλλαγές.",true);
+      return true;
+    }catch(e){
+      this.state="offline"; this.dirty=true; setCloudChip(); return false;
+    }
+  },
+  async retry(){ if(this.dirty&&this.pending){ await this.push(this.pending); if(!this.dirty) toast("☁ Οι εκκρεμείς αλλαγές στάλθηκαν στο cloud."); } }
+};
+function setCloudChip(){
+  const c=$("#cloudChip"), t=$("#cloudTxt"); if(!c||!t) return;
+  if(CLOUD.dirty){ c.className="chip off"; t.textContent="☁ Εκκρεμεί αποστολή…"; return; }
+  if(CLOUD.state==="online"){ c.className="chip on"; t.textContent="☁ Cloud ενεργό"; return; }
+  if(CLOUD.state==="empty"){ c.className="chip"; t.textContent="☁ Cloud κενό"; return; }
+  if(CLOUD.state==="offline"){ c.className="chip off"; t.textContent="☁ Εκτός σύνδεσης"; return; }
+  c.className="chip"; t.textContent="☁ …";
+}
+
 const Store={
   mode:"memory", mem:null,
   init(){
     try{ if(window.storage&&typeof window.storage.get==="function"){ this.mode="artifact"; return; } }catch(e){}
     try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); this.mode="local"; }catch(e){ this.mode="memory"; }
   },
-  async loadRaw(){
+  async loadLocal(){
     try{
       if(this.mode==="artifact"){ const r=await window.storage.get(KEY,false); return r&&r.value?JSON.parse(r.value):null; }
       if(this.mode==="local"){ const r=localStorage.getItem(KEY); return r?JSON.parse(r):null; }
       return this.mem?JSON.parse(this.mem):null;
     }catch(e){ return null; }
   },
-  async saveRaw(o){
-    const j=JSON.stringify(o);
+  async saveLocal(j){
     try{
       if(this.mode==="artifact"){ await window.storage.set(KEY,j,false); return; }
       if(this.mode==="local"){ localStorage.setItem(KEY,j); return; }
       this.mem=j;
-    }catch(e){ toast("Αποτυχία αποθήκευσης.",true); }
+    }catch(e){}
+  },
+  /* light=true: αν το cloud δεν έχει νεότερη έκδοση, γύρνα το τοπικό (εξοικονόμηση δεδομένων) */
+  async loadRaw(light){
+    if(light){
+      const newer=await CLOUD.peek();
+      if(!newer) return await this.loadLocal();
+    }
+    const c=await CLOUD.pull();
+    if(c!==undefined&&c!==null){ await this.saveLocal(JSON.stringify(c)); return c; }   // cloud = πηγή αλήθειας
+    return await this.loadLocal();                                                       // κενό cloud ή offline → τοπικό
+  },
+  async saveRaw(o){
+    const j=JSON.stringify(o);
+    await this.saveLocal(j);                       // πάντα τοπική εφεδρεία πρώτα
+    CLOUD.push(o);                                 // αποστολή στο cloud (ασύγχρονα, με retry αν αποτύχει)
+    if(this.mode==="memory") toast("Προσοχή: αδύνατη η τοπική αποθήκευση σε αυτόν τον browser.",true);
   }
 };
 const IDB={
@@ -4443,7 +4535,7 @@ async function reloadFromStore(){
     if($("#back").classList.contains("on")) return;               // ανοιχτό παράθυρο → μη διακόπτεις
     const ae=document.activeElement;
     if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")) return; // πληκτρολογεί
-    const raw=await Store.loadRaw();
+    const raw=await Store.loadRaw(true);
     if(!raw||raw.v!==3) return;
     const js=TD.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(raw.iv)},dekKey,b64d(raw.data)));
     const fresh=JSON.parse(js);
@@ -4455,7 +4547,7 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="4.4";
+const APP_VERSION="4.5";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
@@ -4491,8 +4583,24 @@ async function startApp(){
   updateNotifChip();
   checkAlerts();
   setInterval(checkAlerts,20000);
-  setInterval(reloadFromStore,60000);   // σιωπηλή ανανέωση ανά 60΄΄
+  setInterval(reloadFromStore,60000);   // σιωπηλή ανανέωση ανά 60΄΄ (τώρα ελέγχει και το cloud)
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden) reloadFromStore(); });
+  setInterval(()=>CLOUD.retry(),25000);                                   // εκκρεμείς αποστολές
+  window.addEventListener("online",()=>{ CLOUD.retry(); reloadFromStore(); });
+  setCloudChip();
+
+  /* Μετάπτωση: πρώτη σύνδεση με κενό cloud αλλά υπάρχοντα τοπικά δεδομένα */
+  if(CLOUD.state==="empty"&&!CLOUD.migrAsked&&(vaultWraps||[]).length){
+    CLOUD.migrAsked=true;
+    setTimeout(async()=>{
+      if(confirm("Βρέθηκαν δεδομένα σε αυτή τη συσκευή, ενώ η βάση cloud είναι κενή.\n\nΝα μεταφερθούν τώρα στο cloud, ώστε να είναι διαθέσιμα από κάθε συσκευή και browser;")){
+        const ok=await CLOUD.push(await envelope());
+        toast(ok?"☁ Τα δεδομένα μεταφέρθηκαν στο cloud με επιτυχία.":"Η μεταφορά απέτυχε — θα επαναληφθεί αυτόματα.",!ok);
+      }else{
+        toast("Τα δεδομένα θα ανέβουν στο cloud με την επόμενη αλλαγή που θα αποθηκεύσετε.");
+      }
+    },600);
+  }
 
   if(!prof().setup){
     // Χωρίς ερωτήσεις: μπαίνει κατευθείαν. Η ρύθμιση επιχείρησης είναι προαιρετική
