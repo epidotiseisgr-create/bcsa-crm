@@ -647,6 +647,14 @@
             <div id="gxLogoFileBox" style="display:none;margin-top:10px"><input type="file" id="gxLogoFile" accept="image/*"></div>
             <div id="gxLogoUrlBox" style="display:none;margin-top:10px"><input id="gxLogoUrl" placeholder="https://…/logo.png"><div class="row-end" style="justify-content:flex-start;margin-top:8px"><button class="btn ghost" id="gxLogoUrlGo">Φόρτωση εικόνας</button></div></div>
           </div>
+          <div class="field">
+            <label>Αγαπημένα σχέδια</label>
+            <div class="gxopts" id="gxFavList"></div>
+            <div class="row-end" style="justify-content:flex-start;margin-top:8px">
+              <button class="btn ghost" id="gxFavSave">★ Αποθήκευση τρέχοντος ως αγαπημένο</button>
+            </div>
+            <div class="gxnote">Οι ρυθμίσεις της καρτέλας αποθηκεύονται πλέον αυτόματα και επανέρχονται σε κάθε είσοδο, από οποιαδήποτε συσκευή.</div>
+          </div>
         </div>
       </div>
 
@@ -728,7 +736,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.3 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.4 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1453,6 +1461,8 @@ const norm=d=>{
   if(!Array.isArray(o.reports)) o.reports=[];
   if(!Array.isArray(o.notif)) o.notif=[];
   if(typeof o.appVersion!=="string") o.appVersion="";
+  if(!o.gfx||typeof o.gfx!=="object"||Array.isArray(o.gfx)) o.gfx={};
+  if(!o.gfxFav||typeof o.gfxFav!=="object"||Array.isArray(o.gfxFav)) o.gfxFav={};
   return o;
 };
 const prof=()=>DB.profile||DEF_PROFILE;
@@ -3577,8 +3587,8 @@ function openTerms(){
   <h2>3. Υποχρέωση Ενημέρωσης Πελατών</h2>
   <p>Αποτελεί <strong>αποκλειστική υποχρέωση του δικαιούχου του προγράμματος</strong> να έχει ενημερώσει τους πελάτες του για την καταχώριση και επεξεργασία των προσωπικών τους δεδομένων στο σύστημα, σύμφωνα με την ισχύουσα νομοθεσία περί προστασίας προσωπικών δεδομένων (GDPR / Ν. 4624/2019). Ο δικαιούχος φέρει την ευθύνη εξασφάλισης της απαιτούμενης νόμιμης βάσης επεξεργασίας και της ενημέρωσης των υποκειμένων των δεδομένων.</p>
 
-  <h2>4. Ασφάλεια</h2>
-  <p>Τα δεδομένα αποθηκεύονται τοπικά σε κρυπτογραφημένη μορφή (AES-GCM 256-bit). Ο δικαιούχος οφείλει να διαφυλάσσει τους κωδικούς πρόσβασης και να τηρεί αντίγραφα ασφαλείας.</p>
+  <h2>4. Ασφάλεια &amp; Αποθήκευση</h2>
+  <p>Τα δεδομένα κρυπτογραφούνται <strong>στη συσκευή του χρήστη</strong> (AES-GCM 256-bit) πριν από οποιαδήποτε αποθήκευση ή μεταφορά. Αποθηκεύονται σε κρυπτογραφημένη μορφή σε βάση δεδομένων cloud με έδρα εντός Ευρωπαϊκής Ένωσης (πάροχος υποδομής: Supabase), ώστε να είναι προσβάσιμα από τις εξουσιοδοτημένες συσκευές του δικαιούχου, ενώ διατηρείται και τοπικό κρυπτογραφημένο αντίγραφο σε κάθε συσκευή για λειτουργία χωρίς σύνδεση. Ο πάροχος της υποδομής cloud δεν έχει τεχνική δυνατότητα ανάγνωσης του περιεχομένου, καθώς λαμβάνει αποκλειστικά κρυπτογραφημένα δεδομένα. Ο δικαιούχος οφείλει να διαφυλάσσει τους κωδικούς πρόσβασης και να τηρεί περιοδικά αντίγραφα ασφαλείας.</p>
 
   <h2>5. Αποδοχή</h2>
   <p>Η είσοδος και χρήση του λογισμικού συνιστά <strong>ανεπιφύλακτη αποδοχή</strong> των παρόντων όρων στο σύνολό τους.</p>
@@ -4108,6 +4118,7 @@ function gxLogoSrc(){
 
 /* ---- ζωγραφική αφίσας ---- */
 async function gfxDraw(){
+  gxQueueSave();
   const cv=$("#gxCv"); if(!cv) return;
   cv.width=GX_W; cv.height=GX_H;
   const x=cv.getContext("2d");
@@ -4209,6 +4220,69 @@ async function gxExport(kind){
 }
 
 /* ---- διεπαφή ---- */
+/* ---------- Μονιμότητα ρυθμίσεων Γραφιστικών (v6.4) ----------
+   Οι ρυθμίσεις αποθηκεύονται ανά χρήστη στο DB.gfx[userId] και ταξιδεύουν μέσω cloud.
+   Λογότυπο από ανέβασμα αρχείου αποθηκεύεται μόνο έως ~500 KB, για να μη «φουσκώνει» η βάση. */
+const GX_LOGO_SAVE_MAX=500000;
+function gxUid(){ return (currentUser&&currentUser.id)||"u_admin"; }
+function gxCollect(){
+  return {
+    occ:gfxState.occ, theme:gfxState.theme||0, tvar:gfxState.tvar||0,
+    title:($("#gxTitle")&&$("#gxTitle").value)||"",
+    from:($("#gxFrom")&&$("#gxFrom").value)||"",
+    to:($("#gxTo")&&$("#gxTo").value)||"",
+    body:($("#gxBody")&&$("#gxBody").value)||"",
+    sign:($("#gxSign")&&$("#gxSign").value)||"",
+    phone:($("#gxPhone")&&$("#gxPhone").value)||"",
+    logoMode:gfxState.logoMode||"biz",
+    logoUrl:($("#gxLogoUrl")&&$("#gxLogoUrl").value)||"",
+    logoData:(gfxState.logoMode==="file"&&typeof gfxState.logoSrc==="string"&&gfxState.logoSrc.slice(0,5)==="data:"&&gfxState.logoSrc.length<=GX_LOGO_SAVE_MAX)?gfxState.logoSrc:""
+  };
+}
+function gxApply(s){
+  if(!s) return;
+  gfxState._hydr=true;
+  try{
+    if(s.occ&&GFX_DATA.some(o=>o.k===s.occ)) gfxState.occ=s.occ;
+    gfxState.theme=+s.theme||0; gfxState.tvar=+s.tvar||0;
+    const sel=$("#gxOcc"); if(sel) sel.value=gfxState.occ;
+    gxRenderThemes();
+    const set=(id,v)=>{ const el=$("#"+id); if(el&&typeof v==="string") el.value=v; };
+    set("gxTitle",s.title||"ΑΝΑΚΟΙΝΩΣΗ"); set("gxFrom",s.from||""); set("gxTo",s.to||"");
+    set("gxBody",s.body||""); set("gxSign",s.sign||""); set("gxPhone",s.phone||""); set("gxLogoUrl",s.logoUrl||"");
+    gfxState.logoMode=s.logoMode||"biz";
+    if(gfxState.logoMode==="file"&&s.logoData) gfxState.logoSrc=s.logoData;
+    else if(gfxState.logoMode==="file"&&!s.logoData){ gfxState.logoMode="biz"; }   // το αρχείο δεν είχε αποθηκευτεί (μεγάλο)
+    else if(gfxState.logoMode==="url") gfxState.logoSrc=s.logoUrl||"";
+    $$("#gxLogoMode [data-lmode]").forEach(o=>o.classList.toggle("on",o.dataset.lmode===gfxState.logoMode));
+    const fb=$("#gxLogoFileBox"), ub=$("#gxLogoUrlBox");
+    if(fb) fb.style.display=gfxState.logoMode==="file"?"block":"none";
+    if(ub) ub.style.display=gfxState.logoMode==="url"?"block":"none";
+  }finally{ gfxState._hydr=false; }
+}
+function gxQueueSave(){
+  if(gfxState._hydr) return;
+  clearTimeout(gfxState._sv);
+  gfxState._sv=setTimeout(async()=>{
+    try{ DB.gfx[gxUid()]=gxCollect(); await persist(); }catch(e){}
+  },1200);
+}
+function renderGxFavs(){
+  const box=$("#gxFavList"); if(!box) return;
+  const favs=DB.gfxFav[gxUid()]||[];
+  box.innerHTML=favs.length
+    ? favs.map(f=>`<button class="gxopt" data-gxfav="${f.id}"><b>★ ${esc(f.name)}</b><span>${esc((GFX_DATA.find(o=>o.k===(f.s&&f.s.occ))||{}).n||"")}</span></button><button class="gxopt" data-gxfavdel="${f.id}" title="Διαγραφή" style="flex:0 0 auto">✕</button>`).join("")
+    : '<span class="muted" style="font-size:12px">Δεν έχετε αποθηκεύσει αγαπημένα ακόμη.</span>';
+  box.querySelectorAll("[data-gxfav]").forEach(b=>b.onclick=()=>{
+    const f=(DB.gfxFav[gxUid()]||[]).find(x=>x.id===b.dataset.gxfav); if(!f) return;
+    gxApply(f.s); gfxDraw(); toast(`Φορτώθηκε το αγαπημένο «${f.name}».`);
+  });
+  box.querySelectorAll("[data-gxfavdel]").forEach(b=>b.onclick=async()=>{
+    const arr=DB.gfxFav[gxUid()]||[]; const i=arr.findIndex(x=>x.id===b.dataset.gxfavdel); if(i<0) return;
+    if(!confirm(`Διαγραφή του αγαπημένου «${arr[i].name}»;`)) return;
+    arr.splice(i,1); await persist(); renderGxFavs();
+  });
+}
 function gxRenderThemes(){
   const box=$("#gxThemes"); if(!box) return;
   const o=gxOcc();
@@ -4236,6 +4310,16 @@ function gfxInit(){
 
   gxRenderThemes();
   gxSuggestText(false);
+  if(DB.gfx&&DB.gfx[gxUid()]) gxApply(DB.gfx[gxUid()]);     // επαναφορά αποθηκευμένων ρυθμίσεων (v6.4)
+  renderGxFavs();
+  { const b=$("#gxFavSave"); if(b) b.onclick=async()=>{
+      const name=(prompt("Όνομα αγαπημένου (π.χ. «Πάσχα με αυγά»):")||"").trim();
+      if(!name) return;
+      const arr=DB.gfxFav[gxUid()]||(DB.gfxFav[gxUid()]=[]);
+      if(arr.length>=12){ toast("Έως 12 αγαπημένα — διαγράψτε κάποιο πρώτα.",true); return; }
+      arr.push({id:"gf_"+uid(),name,s:gxCollect()});
+      await persist(); renderGxFavs(); toast(`Αποθηκεύτηκε το αγαπημένο «${name}».`);
+    } }
 
   ["gxTitle","gxBody","gxSign","gxPhone","gxFrom","gxTo"].forEach(id=>{
     const el=$("#"+id); if(!el) return;
@@ -4590,7 +4674,7 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="4.6";
+const APP_VERSION="4.7";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
