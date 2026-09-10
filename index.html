@@ -744,7 +744,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.7 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.9 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -1640,6 +1640,12 @@ const CLOUD={
     return newer;
   },
   async push(obj){
+    if(this._busy){ this._next=obj; this.pending=obj; return true; }
+    this._busy=true;
+    try{ return await this._pushNow(obj); }
+    finally{ this._busy=false; if(this._next){ const n=this._next; this._next=null; this.push(n); } }
+  },
+  async _pushNow(obj){
     this.pending=obj;
     try{
       if(this.state==="empty"||this.ver===0){
@@ -1786,7 +1792,17 @@ async function loadFromFolder(){
     DB=norm(d); await persist(); toast("Φορτώθηκαν τα δεδομένα του φακέλου.");
   }catch(e){ toast("Δεν βρέθηκε έγκυρο αρχείο δεδομένων στον φάκελο.",true); }
 }
+function dbSig(){
+  /* Υπογραφή περιεχομένου ΧΩΡΙΣ το χρονόσημο updated — για ανίχνευση πραγματικών αλλαγών (v6.9) */
+  const u=DB.updated; delete DB.updated;
+  const s=JSON.stringify(DB)+"\u00a7"+JSON.stringify(vaultWraps);
+  DB.updated=u;
+  return s;
+}
 async function persist(){
+  const sig=dbSig();
+  if(persist._sig===sig){ renderAll(); return; }   // v6.9: τίποτα δεν άλλαξε → καμία εγγραφή σε δίσκο/cloud
+  persist._sig=sig;
   DB.updated=Date.now();
   try{ await Store.saveRaw(await envelope()); }catch(e){ toast("Σφάλμα κρυπτογράφησης — τα δεδομένα ΔΕΝ αποθηκεύτηκαν.",true); }
   renderAll(); queueSync();
@@ -2834,7 +2850,7 @@ function sendCV(reqId){
     const m=MAILERS.find(x=>x.k===b.dataset.cvm);
     const to=encodeURIComponent(prof().email||"");
     const su=encodeURIComponent(`Βιογραφικά για θέση: ${r.position}`);
-    const bo=encodeURIComponent(`Σχετικά με το αίτημά σας για «${r.position}» (${EMP_TYPE[r.type]}):\n\nΣύνδεσμος: ${$("#cvLink").value}\n\n${$("#cvNote").value}\n\nΜε εκτίμηση,\nΕυάγγελος Γκούλιος — Business Consultancy Academy`);
+    const bo=encodeURIComponent(`Σχετικά με το αίτημά σας για «${r.position}» (${EMP_TYPE[r.type]}):\n\nΣύνδεσμος: ${$("#cvLink").value}\n\n${$("#cvNote").value}`+SIGN());
     openTab(m.u(to,su,bo));
     await doNotify(); closeModal(); toast("Άνοιξε το μήνυμα.");
   });
@@ -3440,20 +3456,30 @@ const MAILERS=[
   {k:"mailto",  n:"Προεπιλεγμένη εφαρμογή",    u:(to,su,bo)=>`mailto:${to}?subject=${su}&body=${bo}`}
 ];
 const lastMailer=()=>{ try{ return localStorage.getItem("bcsa-mailer")||"gmail"; }catch(e){ return "gmail"; } };
-const SIGN="\n\nΜε εκτίμηση,\nΕυάγγελος Γκούλιος\nBusiness Consultancy Services and Academy";
+function SIGN(){
+  /* v6.8: Υπογραφή από τα στοιχεία της επιχείρησης του συνδεδεμένου χρήστη.
+     Κανόνας: Υπότιτλος (τίτλος) αν υπάρχει, αλλιώς Επωνυμία· μετά email και τηλέφωνο. */
+  const p=prof();
+  const name=((p.tagline||"").trim())||((p.brand||"").trim());
+  const L=["","","Με εκτίμηση,"];
+  if(name) L.push(name);
+  if((p.email||"").trim()) L.push(p.email.trim());
+  if((p.phone||"").trim()) L.push("Τηλ: "+p.phone.trim());
+  return L.join("\n");
+}
 
 function mailTemplates(c,a){
   const when=a?`${DOW[dowIdx(parseISO(a.date))]} ${grDate(a.date)} και ώρα ${a.time}`:"";
   return {
     confirm:{
       s:a?`Επιβεβαίωση ραντεβού — ${grDate(a.date)} ${a.time}`:"Επιβεβαίωση ραντεβού",
-      b:`Αγαπητέ/ή ${c.name},\n\nΕπιβεβαιώνουμε το ραντεβού μας${a?` για ${when}`:""}.\n\nΠαρακαλώ ενημερώστε με σε περίπτωση που χρειάζεται αλλαγή.${SIGN}`
+      b:`Αγαπητέ/ή ${c.name},\n\nΕπιβεβαιώνουμε το ραντεβού μας${a?` για ${when}`:""}.\n\nΠαρακαλώ ενημερώστε με σε περίπτωση που χρειάζεται αλλαγή.${SIGN()}`
     },
     remind:{
       s:a?`Υπενθύμιση ραντεβού — ${grDate(a.date)} ${a.time}`:"Υπενθύμιση ραντεβού",
-      b:`Αγαπητέ/ή ${c.name},\n\nΥπενθύμιση για το ραντεβού μας${a?` (${when})`:""}.\n\nΠαραμένω στη διάθεσή σας.${SIGN}`
+      b:`Αγαπητέ/ή ${c.name},\n\nΥπενθύμιση για το ραντεβού μας${a?` (${when})`:""}.\n\nΠαραμένω στη διάθεσή σας.${SIGN()}`
     },
-    blank:{ s:"", b:`Αγαπητέ/ή ${c.name},\n\n${SIGN}` }
+    blank:{ s:"", b:`Αγαπητέ/ή ${c.name},\n\n${SIGN()}` }
   };
 }
 
@@ -3736,6 +3762,7 @@ async function unlockApp(pw,uname){
       const w=r.matched;
       if(w.until && todayISO()>w.until) return {err:`Ο κωδικός «${w.label||""}» έληξε στις ${grDate(w.until)}.`};
       currentUser={id:w.id,label:w.label,admin:!!w.admin,until:w.until||null,perm:w.perm||null};
+      persist._sig=dbSig();
       DB=norm(r.db);
       return {ok:true};
     }
@@ -4373,8 +4400,12 @@ function gxQueueSave(){
   if(gfxState._hydr) return;
   clearTimeout(gfxState._sv);
   gfxState._sv=setTimeout(async()=>{
-    try{ DB.gfx[gxUid()]=gxCollect(); await persist(); }catch(e){}
-  },1200);
+    try{
+      const s=gxCollect();
+      if(JSON.stringify(DB.gfx[gxUid()]||null)===JSON.stringify(s)) return;   // v6.9: καμία αλλαγή → τίποτα
+      DB.gfx[gxUid()]=s; await persist();
+    }catch(e){}
+  },2500);
 }
 function renderGxFavs(){
   const box=$("#gxFavList"); if(!box) return;
@@ -4781,13 +4812,14 @@ async function reloadFromStore(){
     const fresh=JSON.parse(js);
     if((fresh.updated||0)>(DB.updated||0)){
       DB=norm(fresh); vaultWraps=raw.wraps||vaultWraps;
+      persist._sig=dbSig();
       renderAll();
     }
   }catch(e){}
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="5.0";
+const APP_VERSION="5.2";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
