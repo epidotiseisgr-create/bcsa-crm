@@ -744,7 +744,7 @@
   </section>
 </main>
 
-<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v6.9 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
+<footer>Business Consultancy Services and Academy · Ευάγγελος Γκούλιος — BCSA CRM v7.0 · Πολυχρηστική · Κρυπτογραφημένη βάση</footer>
 </div>
 
 <div id="back"><div class="modal" id="modal"></div></div>
@@ -3910,6 +3910,24 @@ function resizeLogo(dataUrl,cb){
   img.src=dataUrl;
 }
 
+function resizeLogoGx(dataUrl,cb){
+  /* v7.0: Σμίκρυνση λογοτύπου για αφίσες — έως 600px (αρκετό για A4/150dpi),
+     διατηρεί διαφάνεια (PNG). Αν το αποτέλεσμα βγει μεγαλύτερο από το πρωτότυπο, κρατά το πρωτότυπο. */
+  const img=new Image();
+  img.onload=()=>{
+    const max=600, r=Math.min(max/img.width,max/img.height,1);
+    const w=Math.max(1,Math.round(img.width*r)), hh=Math.max(1,Math.round(img.height*r));
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=hh;
+    cv.getContext("2d").drawImage(img,0,0,w,hh);
+    try{
+      const out=cv.toDataURL("image/png");
+      cb(out.length<dataUrl.length?out:dataUrl);
+    }catch(e){ cb(dataUrl); }
+  };
+  img.onerror=()=>cb(dataUrl);
+  img.src=dataUrl;
+}
+
 /* ---------- 7d. ΓΡΑΦΙΣΤΙΚΑ (ανακοινώσεις αργιών) ---------- */
 /* Καμβάς A4 οριζόντιο στα 150 dpi = 1754 × 1240 px (ταιριάζει με jpegPdf). */
 const GX_W=1754, GX_H=1240;
@@ -4485,7 +4503,10 @@ function gfxInit(){
       const file=f.files&&f.files[0]; if(!file) return;
       if(file.size>4*1024*1024){ toast("Η εικόνα είναι πολύ μεγάλη (>4 MB).",true); return; }
       const rd=new FileReader();
-      rd.onload=()=>{ gfxState.logoSrc=rd.result; gfxState.logoMode="file"; gfxDraw(); toast("Το λογότυπο φορτώθηκε."); };
+      rd.onload=()=>resizeLogoGx(rd.result,d=>{
+        gfxState.logoSrc=d; gfxState.logoMode="file"; gfxDraw();
+        toast(`Το λογότυπο φορτώθηκε (${Math.round(d.length*3/4/1024)} KB μετά τη βελτιστοποίηση).`);
+      });
       rd.onerror=()=>toast("Δεν ήταν δυνατή η ανάγνωση του αρχείου.",true);
       rd.readAsDataURL(file);
     } }
@@ -4819,7 +4840,7 @@ async function reloadFromStore(){
 }
 
 /* ---------- 10. BOOT ---------- */
-const APP_VERSION="5.2";
+const APP_VERSION="5.3";
 async function versionCheck(){
   // αυτόματη διόρθωση παλιού label
   let fixed=false;
